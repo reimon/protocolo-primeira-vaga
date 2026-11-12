@@ -691,6 +691,50 @@ export class ParallaxBackground {
     ctx.fill();
   }
 
+  renderStreetSeamDivider(ctx, seamX, bgH) {
+    // Suaviza o céu na junção entre cenários diferentes
+    const skyGrad = ctx.createLinearGradient(seamX - 28, 0, seamX + 28, 0);
+    skyGrad.addColorStop(0, 'rgba(135, 206, 250, 0)');
+    skyGrad.addColorStop(0.5, 'rgba(135, 206, 250, 0.45)');
+    skyGrad.addColorStop(1, 'rgba(135, 206, 250, 0)');
+    ctx.fillStyle = skyGrad;
+    ctx.fillRect(seamX - 28, 0, 56, 240);
+
+    // Árvore frondosa 16-bit cobrindo a divisória entre prédios
+    const baseY = bgH - 26;
+    ctx.fillStyle = '#3e2723';
+    ctx.fillRect(seamX - 8, baseY - 120, 16, 120);
+    ctx.fillStyle = '#5d4037';
+    ctx.fillRect(seamX - 4, baseY - 120, 6, 120);
+
+    // Copa pixel-art em camadas
+    const clusters = [
+      { dx: 0, dy: -165, r: 34, c: '#1b5e20' },
+      { dx: -22, dy: -145, r: 26, c: '#2e7d32' },
+      { dx: 22, dy: -145, r: 26, c: '#2e7d32' },
+      { dx: 0, dy: -145, r: 30, c: '#388e3c' },
+      { dx: -12, dy: -170, r: 20, c: '#43a047' },
+      { dx: 14, dy: -162, r: 18, c: '#66bb6a' }
+    ];
+    for (const cl of clusters) {
+      ctx.fillStyle = cl.c;
+      ctx.beginPath();
+      ctx.arc(seamX + cl.dx, baseY + cl.dy, cl.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Poste vitoriano duplo na frente do tronco
+    ctx.fillStyle = '#1c242b';
+    ctx.fillRect(seamX - 3, baseY - 150, 6, 150);
+    ctx.fillRect(seamX - 16, baseY - 150, 32, 4);
+    ctx.fillStyle = '#ffd54f';
+    ctx.fillRect(seamX - 18, baseY - 162, 8, 12);
+    ctx.fillRect(seamX + 10, baseY - 162, 8, 12);
+    ctx.fillStyle = '#263238';
+    ctx.fillRect(seamX - 20, baseY - 165, 12, 3);
+    ctx.fillRect(seamX + 8, baseY - 165, 12, 3);
+  }
+
   // --- CAMADA 3: CALÇADÃO DE CANTARIA E MAR ANIMADO COM CRISTAS DE ESPUMA ---
   render(ctx, cameraX, dt = 0.016) {
     this.waterTime += dt * 4.5;
@@ -706,8 +750,11 @@ export class ParallaxBackground {
       ctx.imageSmoothingEnabled = false;
 
       // 1. Cenário Hi-Bit Alternado: Vila Costeira + Prédios Tech / Coworking / Escritórios (0.4x parallax)
+      // Recorta 100px das bordas laterais para remover qualquer sobreposição fantasma das imagens
+      const cropX = 100;
+      const srcW = Math.max(100, bgPng1.width - cropX * 2);
       const bgH = 540;
-      const bgW = Math.round(bgPng1.width * (bgH / bgPng1.height));
+      const bgW = Math.round(srcW * (bgH / bgPng1.height));
       const parallaxX = cameraX * 0.4;
       const startIdx = Math.floor(parallaxX / bgW) - 1;
       const endIdx = Math.ceil((parallaxX + this.width) / bgW) + 1;
@@ -715,7 +762,17 @@ export class ParallaxBackground {
       for (let idx = startIdx; idx <= endIdx; idx++) {
         const drawX = Math.floor(idx * bgW - parallaxX);
         const img = (Math.abs(idx) % 2 === 1 && bgPng2) ? bgPng2 : bgPng1;
-        ctx.drawImage(img, drawX, 0, bgW + 1, bgH);
+        const imgCropX = Math.min(cropX, Math.floor(img.width * 0.08));
+        const imgSrcW = img.width - imgCropX * 2;
+        ctx.drawImage(img, imgCropX, 0, imgSrcW, img.height, drawX, 0, bgW + 1, bgH);
+      }
+
+      // Divisor visual 16-bit nas junções entre blocos de prédios (árvore + poste vitoriano)
+      for (let idx = startIdx; idx <= endIdx + 1; idx++) {
+        const seamX = Math.floor(idx * bgW - parallaxX);
+        if (seamX > -60 && seamX < this.width + 60) {
+          this.renderStreetSeamDivider(ctx, seamX, bgH);
+        }
       }
 
       // 2. Vida no Céu e Chaminés (Nuvens móveis, Gaivotas batendo asas e Fumaça)
@@ -725,10 +782,13 @@ export class ParallaxBackground {
       const fgTop = 510;
       const fgH = this.height - fgTop; // 210px
       const fgW = Math.round(fgPng.width * (fgH / fgPng.height));
-      const offFg = (cameraX * 1.0) % fgW;
-      for (let x = -offFg - fgW; x < this.width + fgW; x += fgW) {
+      const offFg = ((cameraX * 1.0) % fgW + fgW) % fgW;
+      for (let x = -offFg; x < this.width; x += fgW) {
         ctx.drawImage(fgPng, Math.floor(x), fgTop, fgW + 1, fgH);
       }
+
+      // 3b. Animação em tempo real do mar (efeito raster 16-bit de ondas e correnteza)
+      this.renderAnimatedSeaOverlay(ctx, fgPng, cameraX, fgTop, fgW, fgH);
 
       // 4. Vida no Calçadão: Pessoas andando, Devs, Cachorro, Gato, Pombos e Ciclista!
       this.renderWalkersAndAnimals(ctx, cameraX);
@@ -1073,27 +1133,73 @@ export class ParallaxBackground {
       }
     }
 
-    // 3. Cristas de Espuma Branca Pixelada Animadas no Mar
-    const waterY = this.height - 78;
-    const waveCycle = Math.floor(this.waterTime) % 4;
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
-    for (let x = 0; x < this.width + 32; x += 32) {
-      const waveShift = Math.sin(this.waterTime * 0.5 + (x + cameraX) * 0.03) * 3;
+    // 3. Cristas de Espuma Branca e Reflexos Cintilantes Animados em Tempo Real no Mar
+    const waterY = this.height - 80;
+    const waveCycle = Math.floor(this.waterTime * 2.5) % 4;
+    const drift = (this.waterTime * 16) % 32;
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+    for (let x = -32; x < this.width + 32; x += 32) {
+      const wx = x - drift;
+      const waveShift = Math.sin(this.waterTime * 1.1 + (wx + cameraX) * 0.035) * 3.5;
       const cy = waterY + waveShift;
       if (waveCycle === 0) {
-        ctx.fillRect(x, cy, 18, 2);
-        ctx.fillRect(x + 4, cy + 8, 10, 2);
+        ctx.fillRect(wx, cy, 18, 2);
+        ctx.fillRect(wx + 4, cy + 8, 10, 2);
       } else if (waveCycle === 1) {
-        ctx.fillRect(x + 2, cy - 1, 22, 2);
-        ctx.fillRect(x + 8, cy + 9, 12, 2);
+        ctx.fillRect(wx + 2, cy - 1, 22, 2);
+        ctx.fillRect(wx + 8, cy + 9, 12, 2);
       } else if (waveCycle === 2) {
-        ctx.fillRect(x + 4, cy, 18, 2);
-        ctx.fillRect(x + 2, cy + 7, 8, 2);
+        ctx.fillRect(wx + 4, cy, 18, 2);
+        ctx.fillRect(wx + 2, cy + 7, 8, 2);
       } else {
-        ctx.fillRect(x + 1, cy + 1, 20, 2);
-        ctx.fillRect(x + 6, cy + 8, 12, 2);
+        ctx.fillRect(wx + 1, cy + 1, 20, 2);
+        ctx.fillRect(wx + 6, cy + 8, 12, 2);
+      }
+    }
+
+    // Reflexos cintilantes em 3 faixas de profundidade
+    for (let row = 0; row < 3; row++) {
+      const ryBase = waterY + 18 + row * 18;
+      const rowDrift = (this.waterTime * (22 + row * 10)) % 96;
+      for (let x = -96; x < this.width + 96; x += 96) {
+        const sx = Math.floor(x - rowDrift);
+        const sy = Math.floor(ryBase + Math.sin(this.waterTime * 1.4 + row + x * 0.02) * 2);
+        const glintAlpha = 0.35 + 0.4 * Math.max(0, Math.sin(this.waterTime * 2.5 + row * 1.7 + x * 0.05));
+        ctx.fillStyle = `rgba(224, 247, 250, ${glintAlpha.toFixed(2)})`;
+        ctx.fillRect(sx, sy, 16 + row * 4, 2);
+        ctx.fillRect(sx + 28, sy + 4, 10, 2);
       }
     }
     ctx.restore();
+  }
+
+  /**
+   * Anima a faixa do mar da textura Hi-Bit (fg_promenade) em tempo real
+   * usando fatiamento raster 16-bit (ondulação senoidal + correnteza contínua).
+   */
+  renderAnimatedSeaOverlay(ctx, fgPng, cameraX, fgTop, fgW, fgH) {
+    const waterTop = fgTop + 128; // y = 638..720 (faixa do mar na imagem do cais)
+    const waterH = this.height - waterTop;
+    const stripH = 3;
+
+    for (let sy = waterTop; sy < this.height; sy += stripH) {
+      const depth = (sy - waterTop) / waterH;
+      const relY = (sy - fgTop) / fgH;
+      const srcY = Math.min(fgPng.height - 1, Math.floor(relY * fgPng.height));
+      const srcH = Math.max(1, Math.min(fgPng.height - srcY, Math.ceil((stripH / fgH) * fgPng.height)));
+
+      const waveX = Math.sin(this.waterTime * 1.15 + depth * 7.0) * (2.5 + depth * 5.0)
+        + this.waterTime * (7 + depth * 11);
+      const waveY = Math.sin(this.waterTime * 1.5 + depth * 4.5) * 1.5;
+
+      const offRow = ((cameraX + waveX) % fgW + fgW) % fgW;
+      for (let x = -offRow; x < this.width; x += fgW) {
+        ctx.drawImage(
+          fgPng,
+          0, srcY, fgPng.width, srcH,
+          Math.floor(x), Math.floor(sy + waveY), fgW + 1, stripH + 1
+        );
+      }
+    }
   }
 }
