@@ -6,6 +6,10 @@
 [![Node Modules: 0 MB](https://img.shields.io/badge/Node__Modules-0%20MB%20(Pure%20Vanilla)-blue?style=for-the-badge&logo=javascript)](https://github.com)
 [![Chance de Oferta: Alta](https://img.shields.io/badge/Oferta%20Jr-Garantida%20se%20treinar-gold?style=for-the-badge)](https://github.com)
 
+<p align="center">
+  <img src="assets/screenshots/gameplay.png" alt="Gameplay do Protocolo Primeira Vaga" width="800">
+</p>
+
 ---
 
 ## ☕ Olá, Pequeno Gafanhoto do Código!
