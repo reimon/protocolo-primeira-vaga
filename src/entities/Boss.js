@@ -138,9 +138,26 @@ export class Boss {
         break;
     }
 
-    // Colisão do corpo do Boss com o Player
+    // Colisão do corpo do Boss com o Player (Suporta Stomp estilo Mario!)
     if (this.checkAABB(this, player)) {
-      player.takeDamage(24, soundEngine, screenShake);
+      const playerBottom = player.y + player.height;
+      const isStomping = player.vy > 0 && playerBottom <= this.y + this.height * 0.45;
+
+      if (isStomping) {
+        const stompDmg = player.armorTier === 'gold' ? 45 : 22;
+        this.takeDamage(stompDmg, player.armorTier === 'gold', particleSystem, soundEngine, screenShake);
+        player.y = this.y - player.height - 4;
+        player.vy = -460;
+        player.doubleJumpUsed = false;
+        player.canDash = true;
+        player.invincibleTimer = Math.max(player.invincibleTimer, 0.25);
+        if (soundEngine) soundEngine.playJump();
+        if (particleSystem) {
+          particleSystem.createDamageNumber(player.x + 10, this.y - 16, `STOMP -${stompDmg}`, '#00e5ff');
+        }
+      } else {
+        player.takeDamage(24, soundEngine, screenShake);
+      }
     }
   }
 

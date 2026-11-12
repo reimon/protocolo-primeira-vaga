@@ -75,6 +75,25 @@ export class SelfTest {
       const backDmg = golem.takeDamage(20, -1, null, sound);
       assert('Ataque pelas costas do Golem causa dano', backDmg > 0);
 
+      // Teste de Stomp estilo Mario sobre inimigo (ignora escudo do Golem e quica player)
+      const stompBug = new Enemy('bug', 300, 300);
+      const stompPlayer = new Player(305, 270);
+      stompPlayer.vy = 200; // Caindo sobre o inimigo
+      const initialBugHp = stompBug.hp;
+      stompBug.update(0.016, stompPlayer, [], [], sound, null);
+      assert('Pular em cima do inimigo causa dano (Stomp)', stompBug.hp < initialBugHp);
+      assert('Stomp estilo Mario faz o Player quicar para cima', stompPlayer.vy < 0);
+      assert('Stomp não causa dano ao Player', stompPlayer.hp === 100);
+
+      // Stomp sobre o Golem deve causar dano mesmo com escudo frontal
+      const stompGolem = new Enemy('golem', 400, 300);
+      const initialGolemHp = stompGolem.hp;
+      stompPlayer.x = 405;
+      stompPlayer.y = 270;
+      stompPlayer.vy = 220;
+      stompGolem.update(0.016, stompPlayer, [], [], sound, null);
+      assert('Stomp estilo Mario ignora o escudo frontal do Golem', stompGolem.hp < initialGolemHp);
+
       // 6. Teste do Boss ATS-9000
       const boss = new Boss(800, 300);
       assert('Boss inicia com 500 HP na fase 1', boss.hp === 500 && boss.phase === 1);
