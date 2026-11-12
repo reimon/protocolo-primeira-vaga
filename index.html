@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>PROTOCOLO PRIMEIRA VAGA: A Jornada do Aprendiz</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Container Principal Arcade 16-bit -->
+  <div class="arcade-cabinet">
+    <div class="canvas-wrapper">
+      <canvas id="gameCanvas" width="1280" height="720"></canvas>
+      
+      <!-- Overlay Scanlines CRT Retrô -->
+      <div class="crt-scanlines"></div>
+
+      <!-- HUD Superior Durante a Gameplay -->
+      <div id="hud" class="hud-overlay hidden">
+        <div class="hud-left">
+          <div class="hud-bar-container">
+            <span class="bar-label">CONFIANÇA</span>
+            <div class="bar-frame hp-bar">
+              <div id="hpFill" class="bar-fill hp-fill"></div>
+            </div>
+          </div>
+          <div class="hud-bar-container">
+            <span class="bar-label">SKILLS XP</span>
+            <div class="bar-frame xp-bar">
+              <div id="xpFill" class="bar-fill xp-fill"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="hud-center">
+          <div class="mentor-tip-box">
+            <span class="tip-icon">📜</span>
+            <span id="hudTip" class="tip-text">Siga em frente e fale com o Mestre!</span>
+          </div>
+        </div>
+
+        <div class="hud-right">
+          <div class="score-display">
+            <span class="score-label">SCORE</span>
+            <span id="hudScore" class="score-number">000000</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tela Inicial estilo Mustache Protocol (oculta durante a Abertura e Carregamento) -->
+      <div id="startScreen" class="start-screen hidden">
+        <div class="logo-container">
+          <div class="badge-retro">DEVPRO • EM BUSCA DO PRIMEIRO EMPREGO TECH</div>
+          <h1 class="game-title">
+            <span class="title-top">PROTOCOLO</span>
+            <span class="title-bottom">PRIMEIRA VAGA</span>
+          </h1>
+          <p class="subtitle">DOS TUTORIAIS INFINITOS À OFERTA DE CONTRATO</p>
+        </div>
+
+        <div class="start-actions">
+          <button id="btnPlayGame" class="btn-play">
+            <span class="play-arrow">▶</span> INICIAR JORNADA TECH
+          </button>
+          <div class="controls-legend">
+            <span>[SETAS / A,D]: Andar</span>
+            <span>[ESPAÇO / W / Z]: Pular</span>
+            <span>[X / J]: Atacar com Código</span>
+            <span>[C / SHIFT]: Dash</span>
+          </div>
+        </div>
+
+        <!-- Botões de Canto do Menu -->
+        <div class="menu-footer">
+          <button id="btnIntro" class="btn-icon">🎬 ABERTURA</button>
+          <button id="btnToggleTouch" class="btn-icon">🎮 TOUCH: AUTO</button>
+          <button id="btnLeaderboard" class="btn-icon">🏆 RECORDES</button>
+          <button id="btnMute" class="btn-icon">🔊 ÁUDIO: ON</button>
+        </div>
+      </div>
+
+      <!-- Modais Dinâmicos (Vitória, Game Over, Leaderboard) -->
+      <div id="gameOverlay" class="game-overlay hidden"></div>
+
+      <!-- Controles Virtuais Touch para Telas Menores/Mobile -->
+      <div id="touchControls" class="touch-controls hidden">
+        <div class="dpad-touch">
+          <button id="btnLeft" class="touch-btn">◀</button>
+          <button id="btnRight" class="touch-btn">▶</button>
+        </div>
+        <div class="actions-touch">
+          <button id="btnAttack" class="touch-btn action-atk">⚔️ GOLPE</button>
+          <button id="btnDash" class="touch-btn action-dash">💨 DASH</button>
+          <button id="btnJump" class="touch-btn action-jump">⬆ PULO</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
