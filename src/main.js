@@ -481,6 +481,7 @@ class Game {
 
     // Clamp para evitar teleporte em quedas de framerate
     if (dt > 0.1) dt = 0.1;
+    this.lastDt = dt;
 
     // Hitstop (Freeze Frame ao acertar golpes)
     if (this.hitstopTimer > 0) {
@@ -983,8 +984,8 @@ class Game {
     const shake = this.screenShake.getOffset();
     this.ctx.translate(shake.x, shake.y);
 
-    // 1. Fundo Parallax (3 Camadas)
-    this.parallax.render(this.ctx, this.cameraX);
+    // 1. Fundo Parallax (Camadas + Mundo Vivo)
+    this.parallax.render(this.ctx, this.cameraX, this.lastDt || 0.016);
 
     // 2. Plataformas do Calçadão
     this.renderPlatforms();

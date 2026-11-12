@@ -1,6 +1,6 @@
 /**
  * PROTOCOLO PRIMEIRA VAGA: A Jornada do Aprendiz
- * Enemy.js - 4 Tipos de Inimigos com IA Distinta, Escala Hi-Bit e Stomp estilo Mario
+ * Enemy.js - Vilões Reais da Jornada pelo Primeiro Emprego Tech + Stomp estilo Mario
  */
 
 export class Enemy {
@@ -17,33 +17,39 @@ export class Enemy {
     this.stunTimer = 0;
     this.attackCooldown = 0;
     this.isAlert = false;
+    this.fxTime = Math.random() * 10;
 
-    // Configuração por Tipo (Hitboxes proporcionais ao Herói Hi-Bit)
+    // Configuração por Tipo (Vilões Reais do Mercado Tech)
     if (type === 'bug') {
-      this.width = 44;
-      this.height = 32;
+      this.width = 46;
+      this.height = 34;
       this.hp = 35;
       this.maxHp = 35;
       this.speed = 105;
       this.damage = 12;
       this.xpValue = 30;
       this.scoreValue = 150;
-      this.label = 'BUG';
+      this.label = 'BUG NA SEXTA';
+      this.badgeColor = '#ff1744';
       this.hopTimer = 0;
     } else if (type === 'ghost') {
-      this.width = 44;
-      this.height = 48;
+      this.width = 46;
+      this.height = 50;
       this.hp = 45;
       this.maxHp = 45;
       this.speed = 90;
       this.damage = 15;
       this.xpValue = 45;
       this.scoreValue = 250;
-      this.label = 'IMPOSTOR';
+      this.label = 'SÍNDROME IMPOSTOR';
+      this.badgeColor = '#ba68c8';
       this.floatTimer = Math.random() * Math.PI * 2;
+      this.taunts = ['"Você não sabe nada"', '"Todos são melhores"', '"Vai reprovar!"'];
+      this.tauntIndex = Math.floor(Math.random() * this.taunts.length);
+      this.tauntTimer = 0;
     } else if (type === 'golem') {
-      this.width = 64;
-      this.height = 70;
+      this.width = 66;
+      this.height = 72;
       this.hp = 95;
       this.maxHp = 95;
       this.speed = 60;
@@ -51,10 +57,11 @@ export class Enemy {
       this.xpValue = 90;
       this.scoreValue = 450;
       this.hasFrontShield = true;
-      this.label = 'VAGA JR 5 ANOS';
+      this.label = 'VAGA JR: 5 ANOS EXP';
+      this.badgeColor = '#ffd700';
     } else if (type === 'drone') {
-      this.width = 48;
-      this.height = 40;
+      this.width = 50;
+      this.height = 42;
       this.hp = 40;
       this.maxHp = 40;
       this.speed = 115;
@@ -62,8 +69,8 @@ export class Enemy {
       this.xpValue = 55;
       this.scoreValue = 300;
       this.shootTimer = 1.8;
-      this.label = 'GHOSTING';
-      // Posiciona em altura alcançável para pulo / stomp
+      this.label = 'GHOSTING DO RH';
+      this.badgeColor = '#00e5ff';
       if (this.y < 330) this.y = 370;
     }
 
@@ -74,11 +81,11 @@ export class Enemy {
   update(dt, player, platforms, projectiles, soundEngine, particleSystem) {
     if (this.isDead) return;
 
+    this.fxTime += dt;
     if (this.hitTimer > 0) this.hitTimer -= dt;
     if (this.squashTimer > 0) this.squashTimer -= dt;
     if (this.stunTimer > 0) {
       this.stunTimer -= dt;
-      // Continua aplicando gravidade mesmo atordoado
       if (this.type === 'bug' || this.type === 'golem') {
         this.vy += 1200 * dt;
         this.moveAndCollide(dt, platforms);
@@ -98,40 +105,43 @@ export class Enemy {
 
     // --- IA POR TIPO ---
     if (this.type === 'bug') {
-      const isLunge = absDist < 220;
+      const isLunge = absDist < 230;
       this.isAlert = isLunge;
       const currentSpeed = isLunge ? this.speed * 1.75 : this.speed;
       this.facing = distToPlayer > 0 ? 1 : -1;
       this.vx = this.facing * currentSpeed;
       this.vy += 1200 * dt;
 
-      // Pequeno salto agressivo ao dar o bote
       if (isLunge && this.vy === 0) {
         this.hopTimer += dt;
-        if (this.hopTimer > 1.1) {
+        if (this.hopTimer > 1.05) {
           this.hopTimer = 0;
-          this.vy = -240;
+          this.vy = -250;
         }
       }
 
       this.moveAndCollide(dt, platforms);
     } else if (this.type === 'ghost') {
       this.floatTimer += dt * 3.2;
+      this.tauntTimer += dt;
+      if (this.tauntTimer > 3.0) {
+        this.tauntTimer = 0;
+        this.tauntIndex = (this.tauntIndex + 1) % this.taunts.length;
+      }
+
       this.isAlert = absDist < 260;
       this.facing = distToPlayer > 0 ? 1 : -1;
       this.x += (distToPlayer > 0 ? 1 : -1) * this.speed * dt;
       this.y += Math.sin(this.floatTimer) * 55 * dt;
 
-      // Persegue verticalmente mantendo-se alcançável
       if (player.y - 15 > this.y) this.y += 42 * dt;
       else if (player.y - 15 < this.y) this.y -= 42 * dt;
 
-      // Partícula etérea ocasional
       if (Math.random() < 0.08 && particleSystem) {
         particleSystem.createSparks(this.x + this.width / 2, this.y + this.height / 2, '#ba68c8', 1);
       }
     } else if (this.type === 'golem') {
-      this.isAlert = absDist < 250;
+      this.isAlert = absDist < 260;
       this.facing = distToPlayer > 0 ? 1 : -1;
       this.vx = this.facing * this.speed;
       this.vy += 1200 * dt;
@@ -142,12 +152,11 @@ export class Enemy {
       }
       this.x += this.facing * this.speed * dt;
 
-      // Mantém altura alcançável por pulo (entre y=340 e y=420)
-      const targetY = 380 + Math.sin(Date.now() * 0.004 + this.x * 0.01) * 28;
+      const targetY = 380 + Math.sin(this.fxTime * 2.5 + this.x * 0.01) * 28;
       this.y += (targetY - this.y) * 2.5 * dt;
 
       this.shootTimer -= dt;
-      this.isAlert = this.shootTimer < 0.45 && absDist < 480;
+      this.isAlert = this.shootTimer < 0.5 && absDist < 480;
       if (this.shootTimer <= 0 && absDist < 480) {
         this.shootTimer = 2.2;
         this.shootEmail(projectiles, player, soundEngine);
@@ -161,7 +170,6 @@ export class Enemy {
       const isStomping = player.vy > 0 && playerBottom <= enemyTopZone + 18;
 
       if (isStomping) {
-        // Pulo estilo Mario na cabeça do adversário!
         const stompDmg = 35 + Math.floor((player.bonusDamage || 0) * 0.5);
         this.takeStompDamage(stompDmg, player, soundEngine, particleSystem);
         return;
@@ -180,13 +188,11 @@ export class Enemy {
   takeStompDamage(amount, player, soundEngine, particleSystem) {
     if (this.isDead) return 0;
 
-    // Stomp por cima ignora o escudo frontal do Golem!
     this.hp -= amount;
     this.hitTimer = 0.2;
     this.squashTimer = 0.22;
     this.stunTimer = 0.25;
 
-    // Quique estilo Mario no Player + reset do pulo duplo e dash no ar
     player.y = this.y - player.height - 2;
     player.vy = -420;
     player.doubleJumpUsed = false;
@@ -256,10 +262,10 @@ export class Enemy {
       type: 'ghosting',
       x: this.x + this.width / 2,
       y: this.y + this.height,
-      vx: (dirX / len) * 230,
-      vy: (dirY / len) * 230,
-      width: 16,
-      height: 16,
+      vx: (dirX / len) * 235,
+      vy: (dirY / len) * 235,
+      width: 18,
+      height: 18,
       damage: 16,
       isEnemy: true,
       life: 4.0
@@ -270,7 +276,6 @@ export class Enemy {
   takeDamage(amount, attackFacing, particleSystem, soundEngine) {
     if (this.isDead) return 0;
 
-    // Mecânica do Golem: Escudo frontal bloqueia ataques horizontais de frente!
     if (this.type === 'golem' && this.hasFrontShield) {
       const attackingFromFront = (attackFacing === 1 && this.facing === -1) ||
                                  (attackFacing === -1 && this.facing === 1);
@@ -283,7 +288,7 @@ export class Enemy {
             '#ffd700',
             12
           );
-          particleSystem.createDamageNumber(this.x + 10, this.y - 12, 'BLOQUEADO!', '#ffd700');
+          particleSystem.createDamageNumber(this.x - 10, this.y - 12, 'EXIGE 5 ANOS!', '#ffd700');
         }
         return 0;
       }
@@ -291,7 +296,6 @@ export class Enemy {
 
     this.hp -= amount;
     this.hitTimer = 0.18;
-    // Leve knockback ao receber golpe
     this.x += (attackFacing || 1) * 10;
     if (soundEngine) soundEngine.playHit();
 
@@ -367,7 +371,6 @@ export class Enemy {
 
     ctx.translate(Math.round(centerX), Math.round(footY));
 
-    // Aplica Squash ao levar Stomp
     if (this.squashTimer > 0) {
       ctx.scale(1.35, 0.55);
     }
@@ -379,36 +382,65 @@ export class Enemy {
     ctx.drawImage(sprite, -this.width / 2 - 4, -this.height - 4, this.width + 8, this.height + 6);
     ctx.restore();
 
-    // 3. Escudo Energético Frontal do Golem (Indica visualmente que bloqueia pela frente)
-    if (this.type === 'golem' && this.hasFrontShield) {
-      ctx.save();
-      const shieldX = this.facing === 1 ? screenX + this.width + 2 : screenX - 6;
-      ctx.fillStyle = 'rgba(255, 215, 0, 0.75)';
-      ctx.fillRect(shieldX, screenY + 6, 5, this.height - 12);
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(shieldX + 1, screenY + 12, 2, this.height - 24);
-      ctx.restore();
-    }
-
-    // 4. Indicador de Alerta ('!') quando avista o jogador ou prepara tiro
-    if (this.isAlert) {
-      ctx.save();
-      ctx.fillStyle = '#ff1744';
-      ctx.font = 'bold 14px monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText('!', centerX, screenY - 14);
-      ctx.restore();
-    }
-
-    // 5. Mini Barra de HP e Rótulo (sempre alinhados corretamente, nunca invertidos)
+    // 3. Detalhes Temáticos Animados por Vilão do Primeiro Emprego
     ctx.save();
+    if (this.type === 'golem' && this.hasFrontShield) {
+      const shieldX = this.facing === 1 ? screenX + this.width + 2 : screenX - 10;
+      const pulse = 0.65 + Math.sin(this.fxTime * 6) * 0.25;
+      ctx.fillStyle = `rgba(255, 215, 0, ${pulse})`;
+      ctx.fillRect(shieldX, screenY + 4, 8, this.height - 8);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(shieldX + 2, screenY + 10, 3, this.height - 20);
+    } else if (this.type === 'drone') {
+      // Hélice giratória + LED "VISTO" piscando
+      const rotW = Math.abs(Math.sin(this.fxTime * 22)) * 28 + 4;
+      ctx.fillStyle = '#cfd8dc';
+      ctx.fillRect(centerX - rotW / 2, screenY - 4, rotW, 3);
+      if (this.isAlert) {
+        ctx.fillStyle = '#ff1744';
+        ctx.fillRect(centerX - 3, screenY + 6, 6, 6);
+      }
+    } else if (this.type === 'ghost' && this.isAlert) {
+      // Sussurro da Síndrome do Impostor flutuando
+      ctx.font = 'bold 9px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#e1bee7';
+      ctx.fillText(this.taunts[this.tauntIndex], centerX, screenY - 26);
+    } else if (this.type === 'bug' && this.isAlert) {
+      ctx.font = 'bold 9px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#ff5252';
+      ctx.fillText('ERR_500!', centerX, screenY - 25);
+    }
+    ctx.restore();
+
+    // 4. Tag de Identificação do Vilão (Pílula compacta legível)
+    ctx.save();
+    ctx.font = 'bold 9px monospace';
+    const labelText = this.label;
+    const textW = ctx.measureText(labelText).width;
+    const pillW = textW + 10;
+    const pillX = Math.round(centerX - pillW / 2);
+    const pillY = Math.round(screenY - 22);
+
+    ctx.fillStyle = 'rgba(10, 14, 24, 0.85)';
+    ctx.fillRect(pillX, pillY, pillW, 13);
+    ctx.strokeStyle = this.badgeColor;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(pillX, pillY, pillW, 13);
+
+    ctx.fillStyle = this.badgeColor;
+    ctx.textAlign = 'center';
+    ctx.fillText(labelText, centerX, pillY + 10);
+
+    // 5. Barra de HP quando ferido
     if (this.hp < this.maxHp) {
       const barW = this.width;
       const hpPct = Math.max(0, this.hp / this.maxHp);
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
-      ctx.fillRect(screenX, screenY - 10, barW, 5);
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+      ctx.fillRect(screenX, screenY - 7, barW, 5);
       ctx.fillStyle = '#ff1744';
-      ctx.fillRect(screenX + 1, screenY - 9, (barW - 2) * hpPct, 3);
+      ctx.fillRect(screenX + 1, screenY - 6, (barW - 2) * hpPct, 3);
     }
     ctx.restore();
   }

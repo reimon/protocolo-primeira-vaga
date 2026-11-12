@@ -9,9 +9,138 @@ export class ParallaxBackground {
     this.width = canvasWidth;
     this.height = canvasHeight;
     this.waterTime = 0;
+    this.worldTime = 0;
     this.smokeParticles = [];
 
+    this.initLivingWorld();
     this.createStaticLayers();
+  }
+
+  initLivingWorld() {
+    // 1. Nuvens em movimento lento pelo céu
+    this.clouds = Array.from({ length: 7 }, (_, i) => ({
+      x: i * 240 + Math.random() * 100,
+      y: 30 + (i % 3) * 38,
+      w: 90 + (i % 3) * 35,
+      speed: 10 + (i % 3) * 6
+    }));
+
+    // 2. Gaivotas e pássaros batendo asas no céu
+    this.birds = Array.from({ length: 9 }, (_, i) => ({
+      x: i * 190 + Math.random() * 80,
+      y: 55 + (i % 4) * 32,
+      speed: 35 + (i % 3) * 18,
+      dir: i % 2 === 0 ? 1 : -1,
+      phase: Math.random() * Math.PI * 2
+    }));
+
+    // 3. Barcos a vela navegando no mar ao fundo
+    this.boats = [
+      { x: 350, y: 632, speed: 18, dir: 1, sailColor: '#ffffff', hullColor: '#8d6e63' },
+      { x: 1850, y: 642, speed: 14, dir: -1, sailColor: '#ffd54f', hullColor: '#5d4037' },
+      { x: 3400, y: 636, speed: 22, dir: 1, sailColor: '#80deea', hullColor: '#455a64' }
+    ];
+
+    // 4. Peixes / Golfinhos saltando na água
+    this.jumpingFish = [
+      { x: 520, timer: 0, interval: 4.2, active: false, t: 0 },
+      { x: 1900, timer: 2.0, interval: 5.0, active: false, t: 0 },
+      { x: 3600, timer: 1.0, interval: 4.5, active: false, t: 0 }
+    ];
+
+    // 5. Pessoas, Devs, Cachorro e Ciclista andando pelo calçadão (Mundo Vivo!)
+    this.walkers = [
+      { type: 'dev_coffee', x: 260, dir: 1, speed: 34, shirt: '#1976d2', hair: '#212121', minX: 120, maxX: 900, phase: 0 },
+      { type: 'dog_walker', x: 760, dir: -1, speed: 40, shirt: '#e64a19', hair: '#4e342e', minX: 400, maxX: 1350, phase: 1.2 },
+      { type: 'cyclist', x: 1100, dir: 1, speed: 115, shirt: '#00acc1', hair: '#111', minX: 50, maxX: 4900, phase: 0 },
+      { type: 'dev_laptop', x: 1480, dir: 1, speed: 30, shirt: '#7b1fa2', hair: '#fdd835', minX: 1100, maxX: 2100, phase: 2.1 },
+      { type: 'cat', x: 1750, dir: -1, speed: 22, color: '#ff9800', minX: 1550, maxX: 2200, phase: 0.7 },
+      { type: 'office_worker', x: 2350, dir: -1, speed: 38, shirt: '#37474f', hair: '#1a1a1a', minX: 1900, maxX: 2900, phase: 3.0 },
+      { type: 'dog_walker', x: 2950, dir: 1, speed: 36, shirt: '#2e7d32', hair: '#5d4037', minX: 2500, maxX: 3500, phase: 0.4 },
+      { type: 'dev_coffee', x: 3550, dir: -1, speed: 32, shirt: '#c62828', hair: '#212121', minX: 3100, maxX: 4100, phase: 1.8 },
+      { type: 'cat', x: 4050, dir: 1, speed: 24, color: '#eceff1', minX: 3800, maxX: 4400, phase: 2.5 },
+      { type: 'pigeon_flock', x: 640, dir: 1, speed: 12, minX: 500, maxX: 900, phase: 0 }
+    ];
+
+    // 6. Fumaça animada das chaminés
+    this.smokeParticles = [];
+    this.smokeTimer = 0;
+  }
+
+  updateLivingWorld(dt) {
+    this.worldTime += dt;
+
+    // Atualiza Nuvens
+    for (const c of this.clouds) {
+      c.x += c.speed * dt;
+      if (c.x > this.width + 200) c.x = -c.w - 60;
+    }
+
+    // Atualiza Pássaros
+    for (const b of this.birds) {
+      b.x += b.dir * b.speed * dt;
+      b.phase += dt * 10;
+      if (b.dir === 1 && b.x > this.width + 80) b.x = -60;
+      if (b.dir === -1 && b.x < -80) b.x = this.width + 60;
+    }
+
+    // Atualiza Barcos
+    for (const boat of this.boats) {
+      boat.x += boat.dir * boat.speed * dt;
+      if (boat.dir === 1 && boat.x > 5200) boat.x = -100;
+      if (boat.dir === -1 && boat.x < -100) boat.x = 5200;
+    }
+
+    // Atualiza Peixes saltando
+    for (const f of this.jumpingFish) {
+      if (!f.active) {
+        f.timer += dt;
+        if (f.timer >= f.interval) {
+          f.timer = 0;
+          f.active = true;
+          f.t = 0;
+        }
+      } else {
+        f.t += dt * 1.6;
+        if (f.t >= 1) f.active = false;
+      }
+    }
+
+    // Atualiza Pedestres, Animais e Ciclista
+    for (const w of this.walkers) {
+      w.x += w.dir * w.speed * dt;
+      w.phase += dt * (w.speed * 0.22);
+      if (w.x >= w.maxX) {
+        w.x = w.maxX;
+        w.dir = -1;
+      } else if (w.x <= w.minX) {
+        w.x = w.minX;
+        w.dir = 1;
+      }
+    }
+
+    // Emite fumaça de chaminé
+    this.smokeTimer += dt;
+    if (this.smokeTimer > 0.45) {
+      this.smokeTimer = 0;
+      this.smokeParticles.push({
+        x: 240 + Math.random() * 900,
+        y: 195 + Math.random() * 35,
+        vy: -18 - Math.random() * 10,
+        vx: 8 + Math.random() * 6,
+        size: 6,
+        life: 2.2,
+        maxLife: 2.2
+      });
+    }
+    for (let i = this.smokeParticles.length - 1; i >= 0; i--) {
+      const s = this.smokeParticles[i];
+      s.x += s.vx * dt;
+      s.y += s.vy * dt;
+      s.size += dt * 4;
+      s.life -= dt;
+      if (s.life <= 0) this.smokeParticles.splice(i, 1);
+    }
   }
 
   createStaticLayers() {
@@ -565,25 +694,34 @@ export class ParallaxBackground {
   // --- CAMADA 3: CALÇADÃO DE CANTARIA E MAR ANIMADO COM CRISTAS DE ESPUMA ---
   render(ctx, cameraX, dt = 0.016) {
     this.waterTime += dt * 4.5;
+    this.updateLivingWorld(dt);
 
-    const bgPng = this.renderer && this.renderer.ext && this.renderer.ext('bg_buildings');
+    const bgPng1 = this.renderer && this.renderer.ext && this.renderer.ext('bg_buildings');
+    const bgPng2 = this.renderer && this.renderer.ext && this.renderer.ext('bg_buildings_2');
     const fgPng = this.renderer && this.renderer.ext && (this.renderer.ext('fg_promenade') || this.renderer.ext('fg_promenade_strip'));
     const groundY = this.height - 160;
 
-    if (bgPng && fgPng) {
+    if (bgPng1 && fgPng) {
       ctx.save();
       ctx.imageSmoothingEnabled = false;
 
-      // 1. Cenário Hi-Bit: Céu azul, Castelo e Sobrados Geminados (0.4x parallax)
+      // 1. Cenário Hi-Bit Alternado: Vila Costeira + Prédios Tech / Coworking / Escritórios (0.4x parallax)
       const bgH = 540;
-      const bgW = Math.round(bgPng.width * (bgH / bgPng.height));
-      const offBg = (cameraX * 0.4) % bgW;
-      for (let x = -offBg - bgW; x < this.width + bgW; x += bgW) {
-        ctx.drawImage(bgPng, Math.floor(x), 0, bgW + 1, bgH);
+      const bgW = Math.round(bgPng1.width * (bgH / bgPng1.height));
+      const parallaxX = cameraX * 0.4;
+      const startIdx = Math.floor(parallaxX / bgW) - 1;
+      const endIdx = Math.ceil((parallaxX + this.width) / bgW) + 1;
+
+      for (let idx = startIdx; idx <= endIdx; idx++) {
+        const drawX = Math.floor(idx * bgW - parallaxX);
+        const img = (Math.abs(idx) % 2 === 1 && bgPng2) ? bgPng2 : bgPng1;
+        ctx.drawImage(img, drawX, 0, bgW + 1, bgH);
       }
 
-      // 2. Calçadão do Cais e Mar Azul (1.0x parallax)
-      // O calçadão começa em top=510, alinhando o piso de pedra com groundY = 560
+      // 2. Vida no Céu e Chaminés (Nuvens móveis, Gaivotas batendo asas e Fumaça)
+      this.renderSkyAndSmoke(ctx);
+
+      // 3. Calçadão do Cais e Mar Azul (1.0x parallax)
       const fgTop = 510;
       const fgH = this.height - fgTop; // 210px
       const fgW = Math.round(fgPng.width * (fgH / fgPng.height));
@@ -592,32 +730,16 @@ export class ParallaxBackground {
         ctx.drawImage(fgPng, Math.floor(x), fgTop, fgW + 1, fgH);
       }
 
-      // 3. Cristas de Espuma Branca Pixelada Animadas no Mar (y=640 a 720)
-      const waterY = this.height - 78;
-      const waveCycle = Math.floor(this.waterTime) % 4;
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
-      for (let x = 0; x < this.width + 32; x += 32) {
-        const waveShift = Math.sin(this.waterTime * 0.5 + (x + cameraX) * 0.03) * 3;
-        const cy = waterY + waveShift;
-        if (waveCycle === 0) {
-          ctx.fillRect(x, cy, 18, 2);
-          ctx.fillRect(x + 4, cy + 8, 10, 2);
-        } else if (waveCycle === 1) {
-          ctx.fillRect(x + 2, cy - 1, 22, 2);
-          ctx.fillRect(x + 8, cy + 9, 12, 2);
-        } else if (waveCycle === 2) {
-          ctx.fillRect(x + 4, cy, 18, 2);
-          ctx.fillRect(x + 2, cy + 7, 8, 2);
-        } else {
-          ctx.fillRect(x + 1, cy + 1, 20, 2);
-          ctx.fillRect(x + 6, cy + 8, 12, 2);
-        }
-      }
+      // 4. Vida no Calçadão: Pessoas andando, Devs, Cachorro, Gato, Pombos e Ciclista!
+      this.renderWalkersAndAnimals(ctx, cameraX);
+
+      // 5. Vida no Mar: Barcos a vela, Peixes saltando e Cristas de Espuma Branca
+      this.renderOceanLife(ctx, cameraX);
 
       ctx.restore();
       return;
     }
-    if (bgPng) { this.renderPierAndOcean(ctx, cameraX); return; }
+    if (bgPng1) { this.renderPierAndOcean(ctx, cameraX); return; }
 
     // 1. Fundo (Céu e Cidadela - 0.12x parallax)
     const bgOffset = (cameraX * 0.12) % 1600;
@@ -757,5 +879,221 @@ export class ParallaxBackground {
         ctx.fillRect(x + 8, cy + 22, 12, 2);
       }
     }
+  }
+
+  // --- ELEMENTOS VIVOS DO CENÁRIO (NUVENS, PÁSSAROS, PESSOAS, ANIMAIS, BARCOS) ---
+  renderSkyAndSmoke(ctx) {
+    ctx.save();
+    // 1. Nuvens fofinhas passando no céu
+    for (const c of this.clouds) {
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+      ctx.fillRect(Math.floor(c.x), Math.floor(c.y), c.w, 14);
+      ctx.fillRect(Math.floor(c.x + 12), Math.floor(c.y - 8), c.w - 24, 10);
+      ctx.fillStyle = 'rgba(230, 244, 255, 0.35)';
+      ctx.fillRect(Math.floor(c.x + 6), Math.floor(c.y + 10), c.w - 12, 6);
+    }
+
+    // 2. Gaivotas batendo asas
+    for (const b of this.birds) {
+      const wingUp = Math.sin(b.phase) > 0;
+      const bx = Math.floor(b.x);
+      const by = Math.floor(b.y);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(bx - 2, by, 4, 2); // corpo
+      if (wingUp) {
+        ctx.fillRect(bx - 6, by - 3, 4, 2);
+        ctx.fillRect(bx + 2, by - 3, 4, 2);
+      } else {
+        ctx.fillRect(bx - 6, by + 2, 4, 2);
+        ctx.fillRect(bx + 2, by + 2, 4, 2);
+      }
+    }
+
+    // 3. Fumaça das chaminés
+    for (const s of this.smokeParticles) {
+      const alpha = (s.life / s.maxLife) * 0.45;
+      ctx.fillStyle = `rgba(240, 240, 245, ${alpha.toFixed(2)})`;
+      ctx.fillRect(Math.floor(s.x), Math.floor(s.y), Math.floor(s.size), Math.floor(s.size * 0.8));
+    }
+    ctx.restore();
+  }
+
+  renderWalkersAndAnimals(ctx, cameraX) {
+    const walkY = 532; // Parte traseira do calçadão (atrás do jogador)
+
+    ctx.save();
+    for (const w of this.walkers) {
+      const sx = Math.floor(w.x - cameraX);
+      if (sx < -120 || sx > this.width + 120) continue;
+
+      const step = Math.sin(w.phase);
+      const bob = Math.abs(step) * 2;
+
+      if (w.type === 'cyclist') {
+        // Ciclista pedalando pela rua
+        const wheelRot = Math.floor(this.worldTime * 15) % 2;
+        ctx.fillStyle = 'rgba(0,0,0,0.3)';
+        ctx.fillRect(sx - 16, walkY + 2, 32, 4);
+
+        // Rodas
+        ctx.strokeStyle = '#141013';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(sx - 10, walkY - 4, 6, 0, Math.PI * 2);
+        ctx.arc(sx + 10, walkY - 4, 6, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Quadro da bicicleta
+        ctx.fillStyle = '#ff5252';
+        ctx.fillRect(sx - 10, walkY - 12, 20, 3);
+        // Ciclista
+        ctx.fillStyle = w.shirt;
+        ctx.fillRect(sx - 5, walkY - 26 + wheelRot, 10, 14);
+        ctx.fillStyle = '#ffccbc';
+        ctx.fillRect(sx - 3, walkY - 34 + wheelRot, 8, 8);
+        ctx.fillStyle = '#ffd700'; // Capacete
+        ctx.fillRect(sx - 4, walkY - 36 + wheelRot, 10, 4);
+      } else if (w.type === 'cat') {
+        // Gatinho caminhando pela mureta do cais
+        const tailWag = Math.sin(this.worldTime * 6 + w.x) * 3;
+        ctx.fillStyle = w.color;
+        ctx.fillRect(sx - 6, walkY - 8 - bob * 0.5, 12, 6);
+        ctx.fillRect(sx + (w.dir === 1 ? 4 : -8), walkY - 13 - bob * 0.5, 6, 6); // cabeça
+        ctx.fillRect(sx + (w.dir === 1 ? 5 : -7), walkY - 15 - bob * 0.5, 2, 2); // orelha
+        // Rabo
+        ctx.fillRect(sx + (w.dir === 1 ? -9 : 6), walkY - 11 + tailWag * 0.5, 3, 5);
+        // Patinhas
+        ctx.fillRect(sx - 4 + step * 2, walkY - 2, 2, 3);
+        ctx.fillRect(sx + 2 - step * 2, walkY - 2, 2, 3);
+      } else if (w.type === 'pigeon_flock') {
+        // Pombos bicando o chão e saltitando
+        for (let p = 0; p < 3; p++) {
+          const px = sx + p * 18;
+          const hop = Math.abs(Math.sin(this.worldTime * 5 + p)) * 3;
+          ctx.fillStyle = '#90a4ae';
+          ctx.fillRect(px, walkY - 5 - hop, 6, 4);
+          ctx.fillStyle = '#eceff1';
+          ctx.fillRect(px + 4, walkY - 7 - hop, 3, 3);
+        }
+      } else {
+        // Pedestre / Dev caminhando
+        ctx.fillStyle = 'rgba(0,0,0,0.28)';
+        ctx.fillRect(sx - 6, walkY + 2, 12, 3);
+
+        // Pernas animadas
+        ctx.fillStyle = '#263238';
+        ctx.fillRect(sx - 3 + step * 3, walkY - 9, 3, 10);
+        ctx.fillRect(sx + 1 - step * 3, walkY - 9, 3, 10);
+
+        // Tronco / Camisa
+        ctx.fillStyle = w.shirt;
+        ctx.fillRect(sx - 5, walkY - 21 - bob, 10, 12);
+
+        // Cabeça + Cabelo
+        ctx.fillStyle = '#ffccbc';
+        ctx.fillRect(sx - 4, walkY - 29 - bob, 8, 8);
+        ctx.fillStyle = w.hair;
+        ctx.fillRect(sx - 4, walkY - 31 - bob, 8, 4);
+
+        // Acessório (Café, Laptop ou Cachorro na coleira!)
+        if (w.type === 'dev_coffee') {
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(sx + (w.dir === 1 ? 6 : -8), walkY - 17 - bob, 4, 5);
+        } else if (w.type === 'dev_laptop') {
+          ctx.fillStyle = '#b0bec5';
+          ctx.fillRect(sx + (w.dir === 1 ? 5 : -9), walkY - 16 - bob, 6, 5);
+        } else if (w.type === 'dog_walker') {
+          const dogX = sx + w.dir * 22;
+          const dogStep = Math.sin(w.phase * 1.4) * 2;
+          // Coleira
+          ctx.strokeStyle = '#ffeb3b';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(sx + w.dir * 4, walkY - 14 - bob);
+          ctx.lineTo(dogX, walkY - 8);
+          ctx.stroke();
+
+          // Cachorrinho trotando
+          ctx.fillStyle = '#d7ccc8';
+          ctx.fillRect(dogX - 6, walkY - 9 - Math.abs(dogStep), 12, 6);
+          ctx.fillRect(dogX + (w.dir === 1 ? 4 : -8), walkY - 13 - Math.abs(dogStep), 6, 5); // cabeça
+          ctx.fillStyle = '#8d6e63';
+          ctx.fillRect(dogX - 5 + dogStep, walkY - 3, 2, 4);
+          ctx.fillRect(dogX + 3 - dogStep, walkY - 3, 2, 4);
+        }
+      }
+    }
+    ctx.restore();
+  }
+
+  renderOceanLife(ctx, cameraX) {
+    ctx.save();
+    // 1. Barcos a vela deslizando pelo mar
+    for (const boat of this.boats) {
+      const bx = Math.floor(boat.x - cameraX * 0.7);
+      if (bx < -80 || bx > this.width + 80) continue;
+      const bob = Math.sin(this.waterTime * 0.8 + boat.x * 0.02) * 2;
+      const by = Math.floor(boat.y + bob);
+
+      // Casco
+      ctx.fillStyle = boat.hullColor;
+      ctx.fillRect(bx - 16, by, 32, 7);
+      ctx.fillRect(bx - 12, by + 7, 24, 3);
+      // Mastro
+      ctx.fillStyle = '#3e2723';
+      ctx.fillRect(bx - 1, by - 24, 2, 24);
+      // Vela triangular
+      ctx.fillStyle = boat.sailColor;
+      ctx.beginPath();
+      ctx.moveTo(bx + 1, by - 23);
+      ctx.lineTo(bx + (boat.dir === 1 ? 16 : -16), by - 4);
+      ctx.lineTo(bx + 1, by - 4);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // 2. Peixes/Golfinhos saltando da água com splash
+    for (const f of this.jumpingFish) {
+      if (!f.active) continue;
+      const fx = Math.floor(f.x - cameraX + f.t * 48);
+      if (fx < -40 || fx > this.width + 40) continue;
+      const arc = Math.sin(f.t * Math.PI) * 34;
+      const fy = Math.floor(668 - arc);
+
+      ctx.fillStyle = '#4dd0e1';
+      ctx.fillRect(fx - 5, fy - 3, 10, 6);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(fx - 2, fy - 2, 4, 2);
+
+      // Respingos brancos ao entrar/sair da água
+      if (f.t < 0.2 || f.t > 0.8) {
+        ctx.fillStyle = 'rgba(255,255,255,0.85)';
+        ctx.fillRect(fx - 8, 666, 4, 3);
+        ctx.fillRect(fx + 5, 665, 4, 4);
+      }
+    }
+
+    // 3. Cristas de Espuma Branca Pixelada Animadas no Mar
+    const waterY = this.height - 78;
+    const waveCycle = Math.floor(this.waterTime) % 4;
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
+    for (let x = 0; x < this.width + 32; x += 32) {
+      const waveShift = Math.sin(this.waterTime * 0.5 + (x + cameraX) * 0.03) * 3;
+      const cy = waterY + waveShift;
+      if (waveCycle === 0) {
+        ctx.fillRect(x, cy, 18, 2);
+        ctx.fillRect(x + 4, cy + 8, 10, 2);
+      } else if (waveCycle === 1) {
+        ctx.fillRect(x + 2, cy - 1, 22, 2);
+        ctx.fillRect(x + 8, cy + 9, 12, 2);
+      } else if (waveCycle === 2) {
+        ctx.fillRect(x + 4, cy, 18, 2);
+        ctx.fillRect(x + 2, cy + 7, 8, 2);
+      } else {
+        ctx.fillRect(x + 1, cy + 1, 20, 2);
+        ctx.fillRect(x + 6, cy + 8, 12, 2);
+      }
+    }
+    ctx.restore();
   }
 }

@@ -89,6 +89,7 @@ export class PixelRenderer {
       { key: 'mentor_portrait', path: 'assets/sprites/mentor_portrait.png' },
       { key: 'boss', path: 'assets/sprites/boss_ats_trim.png' },
       { key: 'bg_buildings', path: 'assets/sprites/bg_buildings.png' },
+      { key: 'bg_buildings_2', path: 'assets/sprites/bg_buildings_2.png' },
       { key: 'fg_promenade', path: 'assets/sprites/fg_promenade_strip.png' }
     ];
 
