@@ -86,6 +86,7 @@ export class PixelRenderer {
     const list = [
       { key: 'intro_career', path: 'assets/sprites/intro_career_loading.png' },
       { key: 'hero', path: 'assets/sprites/hero_frames.png' },
+      { key: 'mentor', path: 'assets/sprites/mentor_sprite.png' },
       { key: 'mentor_portrait', path: 'assets/sprites/mentor_portrait.png' },
       { key: 'boss', path: 'assets/sprites/boss_ats_trim.png' },
       { key: 'bg_buildings', path: 'assets/sprites/bg_buildings.png' },
