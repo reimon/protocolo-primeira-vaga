@@ -30,6 +30,13 @@ class Game {
     this.renderer = new PixelRenderer();
     this.sound = new SoundEngine();
     this.screenShake = new ScreenShake();
+    this.screenShakeEnabled = true;
+    const origShakeTrigger = this.screenShake.trigger.bind(this.screenShake);
+    this.screenShake.trigger = (intensity, duration) => {
+      if (this.screenShakeEnabled) origShakeTrigger(intensity, duration);
+    };
+    this.stateBeforeSettings = null;
+    this.settings = { sfx: 85, music: 65, shake: true, crt: true, touch: false };
     this.particles = new ParticleSystem();
     this.leaderboard = new LeaderboardService();
     this.parallax = new ParallaxBackground(this.renderer, this.width, this.height);
@@ -195,6 +202,20 @@ class Game {
         this.input.interactPressed = true;
         this.advanceDialog();
       }
+      if (this.state === 'SETTINGS') {
+        if (key === 'Escape' || key === 'KeyP') {
+          e.preventDefault();
+          this.closeSettings();
+        }
+        return;
+      }
+
+      if ((key === 'Escape' || key === 'KeyP') && (this.state === 'PLAYING' || this.state === 'BOSS_FIGHT' || this.state === 'MENU')) {
+        e.preventDefault();
+        this.openSettings();
+        return;
+      }
+
       if (key === 'KeyM') {
         const isMuted = this.sound.toggleMute();
         this.updateMuteButtonUI(isMuted);
@@ -321,8 +342,9 @@ class Game {
     const toggleTouchBtn = document.getElementById('btnToggleTouch');
     if (toggleTouchBtn) {
       toggleTouchBtn.addEventListener('click', () => {
-        const isEnabled = document.body.classList.toggle('touch-enabled');
-        toggleTouchBtn.textContent = isEnabled ? '🎮 TOUCH: ON' : '🎮 TOUCH: OFF';
+        this.settings.touch = !this.settings.touch;
+        this.applySettings();
+        this.saveSettings();
       });
     }
 
@@ -341,6 +363,134 @@ class Game {
         this.openLeaderboard();
       });
     }
+
+    this.initSettingsUI();
+  }
+
+  initSettingsUI() {
+    try {
+      const saved = localStorage.getItem('ppv_settings_v1');
+      if (saved) {
+        this.settings = { ...this.settings, ...JSON.parse(saved) };
+      }
+    } catch (_) {}
+    this.applySettings();
+
+    const bindClick = (id, fn) => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('click', fn);
+    };
+
+    bindClick('btnSettings', () => this.openSettings());
+    bindClick('btnHudSettings', () => this.openSettings());
+    bindClick('btnSettingsBack', () => this.closeSettings());
+
+    const sliderSfx = document.getElementById('sliderSfx');
+    if (sliderSfx) {
+      sliderSfx.addEventListener('input', (e) => {
+        this.settings.sfx = Number(e.target.value);
+        this.sound.setSfxVolume(this.settings.sfx / 100);
+        this.saveSettings();
+      });
+    }
+
+    const sliderMusic = document.getElementById('sliderMusic');
+    if (sliderMusic) {
+      sliderMusic.addEventListener('input', (e) => {
+        this.settings.music = Number(e.target.value);
+        this.sound.setBgmVolume(this.settings.music / 100);
+        this.saveSettings();
+      });
+    }
+
+    bindClick('btnToggleShake', () => {
+      this.settings.shake = !this.settings.shake;
+      this.applySettings();
+      this.saveSettings();
+    });
+
+    bindClick('btnToggleCrt', () => {
+      this.settings.crt = !this.settings.crt;
+      this.applySettings();
+      this.saveSettings();
+    });
+
+    bindClick('btnKeyboardKeys', () => {
+      const hint = document.getElementById('keyboardKeysHint');
+      if (hint) hint.classList.toggle('hidden');
+    });
+
+    bindClick('btnGamepadTouch', () => {
+      this.settings.touch = !this.settings.touch;
+      this.applySettings();
+      this.saveSettings();
+    });
+  }
+
+  openSettings() {
+    if (this.state === 'SETTINGS') return;
+    this.sound.ensureContext();
+    this.stateBeforeSettings = this.state;
+    this.state = 'SETTINGS';
+    this.input.left = false;
+    this.input.right = false;
+    this.input.jump = false;
+    const modal = document.getElementById('settingsModal');
+    if (modal) modal.classList.remove('hidden');
+  }
+
+  closeSettings() {
+    const modal = document.getElementById('settingsModal');
+    if (modal) modal.classList.add('hidden');
+    const hint = document.getElementById('keyboardKeysHint');
+    if (hint) hint.classList.add('hidden');
+    this.state = this.stateBeforeSettings || 'MENU';
+    this.stateBeforeSettings = null;
+  }
+
+  applySettings() {
+    this.sound.setSfxVolume(this.settings.sfx / 100);
+    this.sound.setBgmVolume(this.settings.music / 100);
+    this.screenShakeEnabled = !!this.settings.shake;
+
+    const crtOverlay = document.querySelector('.crt-scanlines');
+    if (crtOverlay) crtOverlay.classList.toggle('hidden', !this.settings.crt);
+
+    document.body.classList.toggle('touch-enabled', !!this.settings.touch);
+
+    const sliderSfx = document.getElementById('sliderSfx');
+    if (sliderSfx) sliderSfx.value = String(this.settings.sfx);
+
+    const sliderMusic = document.getElementById('sliderMusic');
+    if (sliderMusic) sliderMusic.value = String(this.settings.music);
+
+    const shakeBtn = document.getElementById('btnToggleShake');
+    if (shakeBtn) {
+      shakeBtn.textContent = this.settings.shake ? 'On' : 'Off';
+      shakeBtn.classList.toggle('is-off', !this.settings.shake);
+    }
+
+    const crtBtn = document.getElementById('btnToggleCrt');
+    if (crtBtn) {
+      crtBtn.textContent = this.settings.crt ? 'On' : 'Off';
+      crtBtn.classList.toggle('is-off', !this.settings.crt);
+    }
+
+    const touchBtn = document.getElementById('btnToggleTouch');
+    if (touchBtn) {
+      touchBtn.textContent = this.settings.touch ? '🎮 TOUCH: ON' : '🎮 TOUCH: OFF';
+    }
+
+    const gpBtn = document.getElementById('btnGamepadTouch');
+    if (gpBtn) {
+      gpBtn.classList.toggle('is-off', !this.settings.touch);
+    }
+  }
+
+  saveSettings() {
+    try {
+      localStorage.setItem('ppv_settings_v1', JSON.stringify(this.settings));
+    } catch (_) {}
   }
 
   updateMuteButtonUI(isMuted) {

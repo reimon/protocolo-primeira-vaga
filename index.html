@@ -42,11 +42,12 @@
           </div>
         </div>
 
-        <div class="hud-right">
+        <div class="hud-right" style="display:flex; align-items:center; gap:10px; pointer-events:auto;">
           <div class="score-display">
             <span class="score-label">SCORE</span>
             <span id="hudScore" class="score-number">000000</span>
           </div>
+          <button id="btnHudSettings" class="hud-settings-btn" title="Configurações (ESC / P)">⚙️</button>
         </div>
       </div>
 
@@ -76,9 +77,57 @@
         <!-- Botões de Canto do Menu -->
         <div class="menu-footer">
           <button id="btnIntro" class="btn-icon">🎬 ABERTURA</button>
+          <button id="btnSettings" class="btn-icon">⚙️ SETTINGS</button>
           <button id="btnToggleTouch" class="btn-icon">🎮 TOUCH: AUTO</button>
           <button id="btnLeaderboard" class="btn-icon">🏆 RECORDES</button>
           <button id="btnMute" class="btn-icon">🔊 ÁUDIO: ON</button>
+        </div>
+      </div>
+
+      <!-- Modal de Configurações Estilo 16-Bit (Padrão Mustache Protocol) -->
+      <div id="settingsModal" class="settings-modal hidden">
+        <div class="settings-container">
+          <h2 class="settings-title">SETTINGS</h2>
+
+          <div class="settings-sliders">
+            <div class="setting-slider-row">
+              <span class="setting-icon" title="SFX Volume">🔊</span>
+              <input id="sliderSfx" type="range" min="0" max="100" value="85" class="pixel-slider" />
+            </div>
+            <div class="setting-slider-row">
+              <span class="setting-icon" title="Music Volume">🎵</span>
+              <input id="sliderMusic" type="range" min="0" max="100" value="65" class="pixel-slider" />
+            </div>
+          </div>
+
+          <div class="settings-toggles">
+            <div class="setting-toggle-row">
+              <span class="setting-label">Screen Shake</span>
+              <button id="btnToggleShake" class="pixel-btn">On</button>
+            </div>
+            <div class="setting-toggle-row">
+              <span class="setting-label">CRT Filter</span>
+              <button id="btnToggleCrt" class="pixel-btn">On</button>
+            </div>
+          </div>
+
+          <div class="settings-controls-section">
+            <div class="controls-heading">CONTROLS</div>
+            <div class="controls-btn-row">
+              <button id="btnKeyboardKeys" class="pixel-btn wide-btn">⌨️ Keyboard Keys</button>
+              <button id="btnGamepadTouch" class="pixel-btn wide-btn">🎮 Gamepad / Touch</button>
+            </div>
+            <div id="keyboardKeysHint" class="keys-hint-box hidden">
+              <div><b>[A/D ou Setas]</b> Mover &nbsp;|&nbsp; <b>[Espaço / W / Z]</b> Pular / Pulo Duplo</div>
+              <div><b>[X / J]</b> Espada de Código &nbsp;|&nbsp; <b>[C / Shift]</b> Dash &nbsp;|&nbsp; <b>[ESC / P]</b> Pausa</div>
+            </div>
+          </div>
+
+          <div class="settings-footer">
+            <button id="btnSettingsBack" class="pixel-btn back-btn">
+              <span class="back-emblem">⚔️</span> Back
+            </button>
+          </div>
         </div>
       </div>
 

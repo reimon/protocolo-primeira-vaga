@@ -31,10 +31,10 @@ export class SoundEngine {
     this.masterGain.gain.setValueAtTime(0.7, this.ctx.currentTime);
 
     this.bgmGain = this.ctx.createGain();
-    this.bgmGain.gain.setValueAtTime(0.4, this.ctx.currentTime);
+    this.bgmGain.gain.setValueAtTime((this.bgmVolume ?? 0.65) * 0.6, this.ctx.currentTime);
 
     this.sfxGain = this.ctx.createGain();
-    this.sfxGain.gain.setValueAtTime(0.7, this.ctx.currentTime);
+    this.sfxGain.gain.setValueAtTime(this.sfxVolume ?? 0.85, this.ctx.currentTime);
 
     this.bgmGain.connect(this.masterGain);
     this.sfxGain.connect(this.masterGain);
@@ -56,6 +56,20 @@ export class SoundEngine {
       this.masterGain.gain.setValueAtTime(this.isMuted ? 0 : 0.7, this.ctx.currentTime);
     }
     return this.isMuted;
+  }
+
+  setSfxVolume(val) {
+    this.sfxVolume = Math.max(0, Math.min(1, val));
+    if (this.sfxGain && this.ctx) {
+      this.sfxGain.gain.setValueAtTime(this.sfxVolume, this.ctx.currentTime);
+    }
+  }
+
+  setBgmVolume(val) {
+    this.bgmVolume = Math.max(0, Math.min(1, val));
+    if (this.bgmGain && this.ctx) {
+      this.bgmGain.gain.setValueAtTime(this.bgmVolume * 0.6, this.ctx.currentTime);
+    }
   }
 
   // --- SÍNTESE DE NOTAS RETRÔ ---
