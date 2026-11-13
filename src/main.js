@@ -61,6 +61,11 @@ class Game {
     this.platforms = [];
     this.collectibles = [];
     this.projectiles = [];
+    this.checkpoints = [];
+    this.hazards = [];
+    this.activeCheckpoint = null;
+    this.currentZone = 1;
+    this.zoneBanner = null;
 
     // Estatísticas da Partida
     this.stats = {
@@ -512,6 +517,9 @@ class Game {
 
     // Cria o Protagonista
     this.player = new Player(80, this.height - 220);
+    this.activeCheckpoint = { x: 80, y: this.height - 220, zone: 1, label: 'Início' };
+    this.currentZone = 1;
+    this.showZoneBanner('ZONA 1', 'A Vila da Procrastinação');
 
     // Constrói o Nível (Plataformas, Inimigos, Mentores e Colecionáveis)
     this.buildLevel();
@@ -535,6 +543,8 @@ class Game {
     this.mentors = [];
     this.collectibles = [];
     this.projectiles = [];
+    this.checkpoints = [];
+    this.hazards = [];
 
     const groundY = this.height - 160;
 
@@ -577,11 +587,19 @@ class Game {
     }));
 
     // --- ZONA 2: FLORESTA DOS TUTORIAIS INFINITOS (1600 - 3400) ---
+    this.checkpoints.push({ x: 1620, y: groundY - 64, width: 32, height: 64, zone: 2, label: 'Floresta dos Tutoriais', activated: false });
     this.platforms.push({ x: 1750, y: groundY - 80, width: 140, height: 20 });
     this.platforms.push({ x: 1980, y: groundY - 140, width: 140, height: 20 });
     this.platforms.push({ x: 2200, y: groundY - 85, width: 180, height: 20 });
-    this.platforms.push({ x: 2550, y: groundY - 130, width: 150, height: 20 });
+    this.platforms.push({
+      x: 2550, y: groundY - 130, width: 150, height: 20,
+      moving: { axis: 'y', baseX: 2550, baseY: groundY - 130, range: 40, speed: 1.8, phase: 0, dx: 0, dy: 0 }
+    });
     this.platforms.push({ x: 2850, y: groundY - 70, width: 160, height: 20 });
+
+    // Armadilhas de Burnout / Deadline na Zona 2 (incentiva usar plataformas e Pulo Duplo)
+    this.hazards.push({ x: 1990, y: groundY - 14, width: 110, height: 14, label: 'BURNOUT' });
+    this.hazards.push({ x: 2565, y: groundY - 14, width: 120, height: 14, label: 'DEADLINE' });
 
     // Inimigos Zona 2 (Fantasmas de Síndrome do Impostor & Golems de 5 Anos de Experiência)
     this.enemies.push(new Enemy('ghost', 1800, 280));
@@ -606,9 +624,17 @@ class Game {
     }));
 
     // --- ZONA 3: A CIDADELA CORPORATIVA & ARENA DO RH (3400 - 5200) ---
+    this.checkpoints.push({ x: 3420, y: groundY - 64, width: 32, height: 64, zone: 3, label: 'Cidadela Corporativa', activated: false });
     this.platforms.push({ x: 3600, y: groundY - 90, width: 160, height: 20 });
-    this.platforms.push({ x: 3880, y: groundY - 140, width: 160, height: 20 });
+    this.platforms.push({
+      x: 3880, y: groundY - 140, width: 160, height: 20,
+      moving: { axis: 'x', baseX: 3880, baseY: groundY - 140, range: 75, speed: 1.5, phase: 0, dx: 0, dy: 0 }
+    });
     this.platforms.push({ x: 4180, y: groundY - 75, width: 180, height: 20 });
+
+    // Armadilha de Bug Crítico e Checkpoint pré-Boss
+    this.hazards.push({ x: 3895, y: groundY - 14, width: 130, height: 14, label: 'BUG CRÍTICO' });
+    this.checkpoints.push({ x: 4420, y: groundY - 64, width: 32, height: 64, zone: 3, label: 'Arena do ATS-9000', activated: false });
 
     // Drones de Ghosting
     this.enemies.push(new Enemy('drone', 3700, 240));
@@ -681,8 +707,22 @@ class Game {
     if (this.state === 'PLAYING' || this.state === 'BOSS_FIGHT') {
       this.stats.timeElapsed += dt;
 
+      // Atualiza Banner de Zona
+      if (this.zoneBanner) {
+        this.zoneBanner.timer -= dt;
+        if (this.zoneBanner.timer <= 0) this.zoneBanner = null;
+      }
+
+      // Atualiza Plataformas Móveis e carrega o Player se estiver em cima
+      this.updateMovingPlatforms(dt);
+
       // Atualiza Player
       this.player.update(dt, this.input, this.platforms, this.sound, this.particles);
+
+      // Verifica Troca de Zona, Checkpoints e Armadilhas de Burnout
+      this.updateZoneProgress();
+      this.updateCheckpoints();
+      this.updateHazards();
 
       // Morte do Jogador
       if (this.player.hp <= 0) {
@@ -1047,6 +1087,7 @@ class Game {
     this.state = 'GAME_OVER';
     this.sound.playGameOver();
 
+    const canContinue = this.activeCheckpoint && this.activeCheckpoint.x > 80;
     const overlay = document.getElementById('gameOverlay');
     if (overlay) {
       overlay.innerHTML = `
@@ -1057,15 +1098,129 @@ class Game {
           <div class="score-summary">
             <div>Pontuação Conquistada: ${this.stats.score}</div>
           </div>
-          <button id="btnRetry" class="btn-arcade">TENTAR NOVAMENTE</button>
+          <div style="display:flex; gap:12px; justify-content:center; flex-wrap:wrap;">
+            ${canContinue ? `<button id="btnContinueCheckpoint" class="btn-arcade">CONTINUAR (${this.activeCheckpoint.label.toUpperCase()})</button>` : ''}
+            <button id="btnRetry" class="${canContinue ? 'pixel-btn' : 'btn-arcade'}">${canContinue ? 'RECOMEÇAR DO ZERO' : 'TENTAR NOVAMENTE'}</button>
+          </div>
         </div>
       `;
       overlay.classList.remove('hidden');
+
+      if (canContinue) {
+        document.getElementById('btnContinueCheckpoint').addEventListener('click', () => {
+          overlay.classList.add('hidden');
+          this.continueFromCheckpoint();
+        });
+      }
 
       document.getElementById('btnRetry').addEventListener('click', () => {
         overlay.classList.add('hidden');
         this.startNewGame();
       });
+    }
+  }
+
+  continueFromCheckpoint() {
+    if (!this.player || !this.activeCheckpoint) {
+      this.startNewGame();
+      return;
+    }
+
+    this.player.hp = this.player.maxHp;
+    this.player.vx = 0;
+    this.player.vy = 0;
+    this.player.x = this.activeCheckpoint.x;
+    this.player.y = this.activeCheckpoint.y;
+    this.player.invincibleTimer = 1.8;
+    this.player.hurtTimer = 0;
+    this.player.isDashing = false;
+    this.player.isAttacking = false;
+    this.projectiles = [];
+
+    // Se morreu na luta contra o Boss, reseta o ATS-9000 para uma luta justa
+    if (this.boss && !this.boss.isDead) {
+      this.boss = new Boss(4750, this.height - 160 - 130);
+    }
+
+    this.cameraX = Math.max(0, Math.min(this.player.x - this.width * 0.35, this.levelWidth - this.width));
+    this.state = 'PLAYING';
+    this.sound.startBgm('stage');
+    this.stats.activeMentorTip = `Retomando do commit: ${this.activeCheckpoint.label}!`;
+    this.updateHUD();
+  }
+
+  showZoneBanner(title, subtitle) {
+    this.zoneBanner = { title, subtitle, timer: 3.4, maxTimer: 3.4 };
+  }
+
+  updateZoneProgress() {
+    if (!this.player) return;
+    if (this.currentZone < 2 && this.player.x >= 1600) {
+      this.currentZone = 2;
+      this.showZoneBanner('ZONA 2', 'Floresta dos Tutoriais Infinitos');
+    } else if (this.currentZone < 3 && this.player.x >= 3400) {
+      this.currentZone = 3;
+      this.showZoneBanner('ZONA 3', 'Cidadela Corporativa & Arena do RH');
+    }
+  }
+
+  updateMovingPlatforms(dt) {
+    for (const p of this.platforms) {
+      if (!p.moving) continue;
+      const m = p.moving;
+      const prevX = p.x;
+      const prevY = p.y;
+      m.phase += dt * m.speed;
+
+      if (m.axis === 'x') {
+        p.x = m.baseX + Math.sin(m.phase) * m.range;
+      } else {
+        p.y = m.baseY + Math.sin(m.phase) * m.range;
+      }
+
+      m.dx = p.x - prevX;
+      m.dy = p.y - prevY;
+
+      // Carrega o jogador junto se estiver apoiado nesta plataforma
+      if (this.player && this.player.onGround) {
+        const feetY = this.player.y + this.player.height;
+        const onTop = Math.abs(feetY - prevY) <= 4 &&
+          this.player.x + this.player.width > prevX &&
+          this.player.x < prevX + p.width;
+        if (onTop) {
+          this.player.x += m.dx;
+          this.player.y += m.dy;
+        }
+      }
+    }
+  }
+
+  updateCheckpoints() {
+    if (!this.player) return;
+    for (const cp of this.checkpoints) {
+      if (!cp.activated && this.player.x + this.player.width >= cp.x) {
+        cp.activated = true;
+        this.activeCheckpoint = { x: cp.x, y: this.height - 220, zone: cp.zone, label: cp.label };
+        this.sound.playItemCollect();
+        this.particles.createSparks(cp.x + cp.width / 2, cp.y + 16, '#00e676', 14);
+        this.particles.createDamageNumber(cp.x, cp.y - 14, 'CHECKPOINT SALVO!', '#00e676');
+        this.stats.activeMentorTip = `Commit salvo em: ${cp.label}!`;
+      }
+    }
+  }
+
+  updateHazards() {
+    if (!this.player || this.player.invincibleTimer > 0) return;
+    for (const h of this.hazards) {
+      if (this.player.checkAABB(this.player, h)) {
+        const dmg = this.player.takeDamage(15, this.sound, this.screenShake);
+        this.player.vy = -340;
+        if (dmg > 0) {
+          this.particles.createSparks(this.player.x + this.player.width / 2, this.player.y + this.player.height, '#ff6d00', 10);
+          this.particles.createDamageNumber(this.player.x, this.player.y - 12, `${h.label} -${dmg}`, '#ff6d00');
+        }
+        break;
+      }
     }
   }
 
@@ -1140,6 +1295,10 @@ class Game {
     // 2. Plataformas do Calçadão
     this.renderPlatforms();
 
+    // 2.5. Armadilhas de Burnout e Checkpoints
+    this.renderHazards();
+    this.renderCheckpoints();
+
     // 3. Colecionáveis (Café, Livro, Oferta Dourada)
     this.renderCollectibles();
 
@@ -1174,11 +1333,134 @@ class Game {
       this.boss.renderBossHealthBar(this.ctx, this.width);
     }
 
+    // 10.5. Indicadores Táticos (Dash Cooldown / Pulo Duplo) e Banner de Zona
+    if (this.state === 'PLAYING' || this.state === 'BOSS_FIGHT') {
+      this.renderGameplayIndicators();
+      this.renderZoneBanner();
+    }
+
     // 11. Caixa de Diálogo RPG do Mentor
     if (this.state === 'MENTOR_DIALOG') {
       this.renderMentorDialogBox();
     }
 
+    this.ctx.restore();
+  }
+
+  renderHazards() {
+    const pulse = 0.7 + 0.3 * Math.sin(Date.now() * 0.01);
+    for (const h of this.hazards) {
+      const sx = h.x - this.cameraX;
+      if (sx + h.width < -20 || sx > this.width + 20) continue;
+
+      this.ctx.save();
+      this.ctx.fillStyle = `rgba(255, 61, 0, ${0.75 * pulse})`;
+      this.ctx.fillRect(sx, h.y + 4, h.width, h.height - 4);
+
+      // Espinhos pixel-art de Bug/Burnout
+      this.ctx.fillStyle = '#ffd600';
+      for (let x = sx; x < sx + h.width - 8; x += 12) {
+        this.ctx.beginPath();
+        this.ctx.moveTo(x, h.y + h.height);
+        this.ctx.lineTo(x + 6, h.y);
+        this.ctx.lineTo(x + 12, h.y + h.height);
+        this.ctx.closePath();
+        this.ctx.fill();
+      }
+      this.ctx.restore();
+    }
+  }
+
+  renderCheckpoints() {
+    for (const cp of this.checkpoints) {
+      const sx = cp.x - this.cameraX;
+      if (sx < -60 || sx > this.width + 60) continue;
+
+      this.ctx.save();
+      // Poste do Checkpoint
+      this.ctx.fillStyle = '#455a64';
+      this.ctx.fillRect(sx + 12, cp.y, 6, cp.height);
+
+      // Bandeira / Terminal Git Commit
+      const active = cp.activated;
+      this.ctx.fillStyle = active ? '#00e676' : '#ffab00';
+      this.ctx.fillRect(sx + 18, cp.y + 4, 24, 16);
+      this.ctx.fillStyle = '#0d1117';
+      this.ctx.font = '8px "Press Start 2P", monospace';
+      this.ctx.fillText(active ? 'OK' : 'GIT', sx + 20, cp.y + 15);
+
+      // Brilho na base quando ativo
+      if (active) {
+        this.ctx.fillStyle = 'rgba(0, 230, 118, 0.25)';
+        this.ctx.fillRect(sx + 4, cp.y + cp.height - 6, 22, 6);
+      }
+      this.ctx.restore();
+    }
+  }
+
+  renderGameplayIndicators() {
+    if (!this.player) return;
+    this.ctx.save();
+    const x = 18;
+    const y = 94;
+
+    // Indicador de Cooldown do Dash
+    const ready = this.player.dashCooldownTimer <= 0;
+    const pct = ready ? 1 : Math.max(0, 1 - this.player.dashCooldownTimer / this.player.dashCooldown);
+
+    this.ctx.fillStyle = 'rgba(10, 14, 26, 0.78)';
+    this.ctx.fillRect(x, y, 128, 22);
+    this.ctx.strokeStyle = ready ? '#00e5ff' : '#546e7a';
+    this.ctx.lineWidth = 2;
+    this.ctx.strokeRect(x, y, 128, 22);
+
+    this.ctx.fillStyle = ready ? '#00e5ff' : '#ff9100';
+    this.ctx.fillRect(x + 3, y + 3, Math.floor(122 * pct), 16);
+
+    this.ctx.fillStyle = '#ffffff';
+    this.ctx.font = '9px "Press Start 2P", monospace';
+    this.ctx.fillText(ready ? 'DASH READY' : 'DASH...', x + 8, y + 15);
+
+    // Badge de Pulo Duplo se desbloqueado
+    if (this.player.hasDoubleJump) {
+      this.ctx.fillStyle = 'rgba(10, 14, 26, 0.78)';
+      this.ctx.fillRect(x + 136, y, 112, 22);
+      this.ctx.strokeStyle = '#ffd700';
+      this.ctx.strokeRect(x + 136, y, 112, 22);
+      this.ctx.fillStyle = '#ffd700';
+      this.ctx.fillText('2X JUMP', x + 148, y + 15);
+    }
+    this.ctx.restore();
+  }
+
+  renderZoneBanner() {
+    if (!this.zoneBanner) return;
+    const { title, subtitle, timer, maxTimer } = this.zoneBanner;
+    const fadeIn = Math.min(1, (maxTimer - timer) / 0.35);
+    const fadeOut = Math.min(1, timer / 0.5);
+    const alpha = Math.max(0, Math.min(fadeIn, fadeOut));
+
+    this.ctx.save();
+    this.ctx.globalAlpha = alpha;
+    const boxW = 540;
+    const boxH = 68;
+    const boxX = (this.width - boxW) / 2;
+    const boxY = 104;
+
+    this.ctx.fillStyle = 'rgba(8, 12, 24, 0.88)';
+    this.ctx.fillRect(boxX, boxY, boxW, boxH);
+    this.ctx.strokeStyle = '#00e5ff';
+    this.ctx.lineWidth = 2;
+    this.ctx.strokeRect(boxX, boxY, boxW, boxH);
+
+    this.ctx.textAlign = 'center';
+    this.ctx.fillStyle = '#ffd700';
+    this.ctx.font = '14px "Press Start 2P", monospace';
+    this.ctx.fillText(title, this.width / 2, boxY + 28);
+
+    this.ctx.fillStyle = '#e0f7fa';
+    this.ctx.font = '10px "Press Start 2P", monospace';
+    this.ctx.fillText(subtitle, this.width / 2, boxY + 50);
     this.ctx.restore();
   }
 
