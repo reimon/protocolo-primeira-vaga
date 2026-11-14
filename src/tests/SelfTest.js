@@ -12,6 +12,7 @@ import { Boss } from '../entities/Boss.js';
 import { ParallaxBackground } from '../world/ParallaxBackground.js';
 import { LoadingScene } from '../world/LoadingScene.js';
 import { LeaderboardService } from '../services/LeaderboardService.js';
+import { buildLevel1 } from '../world/Level1.js';
 
 export class SelfTest {
   static runAll() {
@@ -123,6 +124,13 @@ export class SelfTest {
       loading.targetProgress = 100;
       loading.update(0.5);
       assert('LoadingScene responde a avanço de targetProgress', loading.targetProgress === 100);
+
+      // 9. Teste de Dados da Fase 1 (Checkpoints, Plataformas Móveis e Armadilhas)
+      const level = buildLevel1(5200, 720);
+      assert('Level1 gera 3 checkpoints', level.checkpoints.length === 3);
+      assert('Level1 possui plataformas móveis', level.platforms.some(p => !!p.moving));
+      assert('Level1 possui armadilhas de burnout', level.hazards.length >= 3);
+      assert('Level1 instancia o Boss ATS-9000', level.boss && level.boss.maxHp === 500);
 
     } catch (error) {
       console.error('Falha crítica nos testes:', error);

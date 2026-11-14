@@ -4,9 +4,10 @@
  */
 
 export class Player {
-  constructor(x, y) {
+  constructor(x, y, gender = 'male') {
     this.x = x;
     this.y = y;
+    this.gender = gender === 'female' ? 'female' : 'male';
     this.width = 32;
     this.height = 42;
 
@@ -63,10 +64,12 @@ export class Player {
     this.state = 'idle';
     this.animTimer = 0;
     this.animFrame = 1;
+    this.idleAnimTime = 0;
   }
 
   update(dt, input, platforms, soundEngine, particleSystem) {
     // Redução de Timers
+    this.idleAnimTime += dt;
     if (this.hurtTimer > 0) this.hurtTimer -= dt;
     if (this.invincibleTimer > 0) this.invincibleTimer -= dt;
     if (this.dashCooldownTimer > 0) this.dashCooldownTimer -= dt;
@@ -325,12 +328,13 @@ export class Player {
     ctx.fill();
     ctx.restore();
 
-    // Sprite sheet PNG Hi-Bit (4 frames: corrida1, corrida2, preparo, golpe)
-    const sheet = renderer.ext && renderer.ext('hero');
+    // Sprite sheet PNG Hi-Bit (4 frames: corrida1, corrida2, preparo/guarda, golpe)
+    const sheetKey = this.gender === 'female' ? 'hero_female' : 'hero';
+    const sheet = renderer.ext && (renderer.ext(sheetKey) || renderer.ext('hero'));
     if (sheet) {
       const fw = sheet.width / 4;
       const fh = sheet.height;
-      let frame = 0;
+      let frame = 2;
       if (this.isAttacking) {
         frame = this.attackTimer > 0.12 ? 2 : 3;
       } else if (this.state === 'run') {
@@ -338,7 +342,8 @@ export class Player {
       } else if (this.state === 'jump' || this.state === 'fall' || this.state === 'dash') {
         frame = 1;
       } else {
-        frame = 0; // idle
+        // Parado em guarda pronta (frame 2) com respiração e balanço contínuos
+        frame = 2;
       }
 
       const drawH = 82;
@@ -349,11 +354,23 @@ export class Player {
       if (this.armorTier === 'gold') {
         ctx.shadowColor = '#ffd700';
         ctx.shadowBlur = 14;
+      } else if (this.state === 'idle') {
+        ctx.shadowColor = 'rgba(0, 229, 255, 0.55)';
+        ctx.shadowBlur = 5 + Math.sin(this.idleAnimTime * 4.5) * 3;
       }
+
       ctx.translate(Math.round(footX), Math.round(footY));
       if (this.facing === -1) {
         ctx.scale(-1, 1);
       }
+
+      if (this.state === 'idle') {
+        const breath = Math.sin(this.idleAnimTime * 4.5);
+        const sway = Math.sin(this.idleAnimTime * 2.25) * 0.025;
+        ctx.rotate(sway);
+        ctx.scale(1 - breath * 0.025, 1 + breath * 0.038);
+      }
+
       // Âncora centralizada na base
       ctx.drawImage(sheet, frame * fw, 0, fw, fh, -drawW / 2, -drawH, drawW, drawH);
       ctx.restore();
