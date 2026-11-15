@@ -131,6 +131,16 @@ export class SelfTest {
       assert('Level1 possui plataformas móveis', level.platforms.some(p => !!p.moving));
       assert('Level1 possui armadilhas de burnout', level.hazards.length >= 3);
       assert('Level1 instancia o Boss ATS-9000', level.boss && level.boss.maxHp === 500);
+      assert('Level1 possui recompensas secretas altas', level.collectibles.some(c => c.xpBonus >= 120));
+
+      // 10. Teste de Level Up e Onda de Código no 3º Hit
+      const wavePlayer = new Player(100, 200, 'female');
+      wavePlayer.addXp(100, sound, null);
+      assert('Player sobe para Nível 2 ao atingir 100 XP', wavePlayer.level === 2);
+      wavePlayer.triggerAttack(sound);
+      wavePlayer.triggerAttack(sound);
+      wavePlayer.triggerAttack(sound);
+      assert('3º golpe no Nível 2 gera projétil Onda de Código', wavePlayer.pendingProjectile && wavePlayer.pendingProjectile.type === 'code_wave');
 
     } catch (error) {
       console.error('Falha crítica nos testes:', error);

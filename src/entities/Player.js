@@ -59,6 +59,7 @@ export class Player {
     // Hitbox de ataque atual (relativa ou absoluta)
     this.attackHitbox = null;
     this.enemiesHitThisAttack = new Set();
+    this.pendingProjectile = null;
 
     // Animação
     this.state = 'idle';
@@ -101,9 +102,10 @@ export class Player {
       if (input.left) dir -= 1;
       if (input.right) dir += 1;
 
-      if (dir !== 0 && !this.isAttacking) {
+      // Permite manter momentum no ar durante o ataque (air-attack drift)
+      if (dir !== 0 && (!this.isAttacking || !this.onGround)) {
         this.vx = dir * this.moveSpeed;
-        this.facing = dir;
+        if (!this.isAttacking) this.facing = dir;
         if (this.onGround && Math.random() < 0.25 && particleSystem) {
           particleSystem.createDust(this.x + this.width / 2, this.y + this.height);
         }
@@ -211,6 +213,22 @@ export class Player {
       damage: (18 + this.comboStep * 8 + this.bonusDamage),
       step: this.comboStep
     };
+
+    // No 3º golpe do combo (a partir do Nível 2 ou Armadura Dourada), dispara Onda de Código!
+    if (this.comboStep === 3 && (this.level >= 2 || this.armorTier === 'gold')) {
+      this.pendingProjectile = {
+        type: 'code_wave',
+        x: this.facing === 1 ? this.x + this.width : this.x - 24,
+        y: this.y + 8,
+        vx: this.facing * 480,
+        vy: 0,
+        width: 24,
+        height: 24,
+        damage: 20 + this.bonusDamage,
+        isPlayer: true,
+        life: 0.9
+      };
+    }
   }
 
   takeDamage(amount, soundEngine, screenShake) {
@@ -232,9 +250,9 @@ export class Player {
     this.hp = Math.min(this.maxHp, this.hp + amount);
   }
 
-  addXp(amount, soundEngine) {
+  addXp(amount, soundEngine, particleSystem = null) {
     this.xp += amount;
-    if (this.xp >= this.nextXp) {
+    while (this.xp >= this.nextXp) {
       this.xp -= this.nextXp;
       this.level += 1;
       this.nextXp = Math.floor(this.nextXp * 1.5);
@@ -242,6 +260,14 @@ export class Player {
       this.hp = this.maxHp;
       this.bonusDamage += 4;
       soundEngine.playLevelUp();
+
+      if (particleSystem) {
+        particleSystem.createSparks(this.x + this.width / 2, this.y + this.height / 2, '#ffd700', 18);
+        const msg = this.level === 2
+          ? 'LV 2! ONDA DE CÓDIGO!'
+          : `LEVEL ${this.level}! +ATK +HP`;
+        particleSystem.createDamageNumber(this.x - 10, this.y - 20, msg, '#ffd700');
+      }
     }
   }
 
@@ -351,7 +377,10 @@ export class Player {
 
       ctx.save();
       ctx.imageSmoothingEnabled = false;
-      if (this.armorTier === 'gold') {
+      if (this.isAttacking && this.comboStep === 3) {
+        ctx.shadowColor = '#ffd700';
+        ctx.shadowBlur = 18;
+      } else if (this.armorTier === 'gold') {
         ctx.shadowColor = '#ffd700';
         ctx.shadowBlur = 14;
       } else if (this.state === 'idle') {

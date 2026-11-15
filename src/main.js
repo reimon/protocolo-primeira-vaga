@@ -77,6 +77,7 @@ class Game {
       timeElapsed: 0,
       activeMentorTip: 'Construa portfólio prático e fale com o Mentor da Carreira!'
     };
+    this.combo = { count: 0, timer: 0, maxTimer: 2.6 };
 
     this.input = {
       left: false,
@@ -165,6 +166,7 @@ class Game {
     };
 
     this.player = new Player(80, this.height - 220, this.settings.heroGender);
+    this.combo = { count: 0, timer: 0, maxTimer: 2.6 };
     this.activeCheckpoint = { x: 80, y: this.height - 220, zone: 1, label: 'Início' };
     this.currentZone = 1;
     this.showZoneBanner('ZONA 1', 'A Vila da Procrastinação');
@@ -235,13 +237,19 @@ class Game {
     }
 
     if (this.state === 'MENTOR_DIALOG') {
+      InputController.pollGamepad(this);
       this.dialog.update(dt, this.input);
       return;
     }
 
     if (this.state !== 'PLAYING' && this.state !== 'BOSS_FIGHT') return;
 
+    InputController.pollGamepad(this);
     this.stats.timeElapsed += dt;
+    if (this.combo.timer > 0) {
+      this.combo.timer -= dt;
+      if (this.combo.timer <= 0) this.combo.count = 0;
+    }
     if (this.zoneBanner) {
       this.zoneBanner.timer -= dt;
       if (this.zoneBanner.timer <= 0) this.zoneBanner = null;
@@ -249,6 +257,11 @@ class Game {
 
     this.updateMovingPlatforms(dt);
     this.player.update(dt, this.input, this.platforms, this.sound, this.particles);
+
+    if (this.player.pendingProjectile) {
+      this.projectiles.push(this.player.pendingProjectile);
+      this.player.pendingProjectile = null;
+    }
 
     this.updateZoneProgress();
     this.updateCheckpoints();
@@ -286,7 +299,7 @@ class Game {
       if (e.isDead) {
         this.stats.enemiesDefeated++;
         this.stats.score += e.scoreValue;
-        this.player.addXp(e.xpValue, this.sound);
+        this.player.addXp(e.xpValue, this.sound, this.particles);
         this.enemies.splice(i, 1);
       }
     }
@@ -299,11 +312,13 @@ class Game {
 
       this.sound.playItemCollect();
       if (col.type === 'coffee') {
-        this.player.heal(30);
-        this.particles.createDamageNumber(col.x, col.y - 10, '+30 CONFIANÇA', '#00e676');
+        const healAmt = col.healBonus || 30;
+        this.player.heal(healAmt);
+        this.particles.createDamageNumber(col.x, col.y - 10, `+${healAmt} CONFIANÇA`, '#00e676');
       } else if (col.type === 'book') {
-        this.player.addXp(60, this.sound);
-        this.particles.createDamageNumber(col.x, col.y - 10, '+60 XP SKILLS', '#00e5ff');
+        const xpAmt = col.xpBonus || 60;
+        this.player.addXp(xpAmt, this.sound, this.particles);
+        this.particles.createDamageNumber(col.x, col.y - 10, `+${xpAmt} XP SKILLS`, '#00e5ff');
       } else if (col.type === 'offer') {
         this.triggerVictory();
         return true;
@@ -320,9 +335,32 @@ class Game {
       p.y += p.vy * dt;
       p.life -= dt;
 
+      if (p.isPlayer) {
+        let hit = false;
+        for (const e of this.enemies) {
+          if (!e.isDead && this.player.checkAABB(p, e)) {
+            const dealt = e.takeDamage(p.damage, p.vx >= 0 ? 1 : -1, this.particles, this.sound);
+            if (dealt > 0) this.registerComboHit(80);
+            hit = true;
+            break;
+          }
+        }
+        if (!hit && this.state === 'BOSS_FIGHT' && this.boss && !this.boss.isDead && this.player.checkAABB(p, this.boss)) {
+          const dealt = this.boss.takeDamage(p.damage, this.player.armorTier === 'gold', this.particles, this.sound, this.screenShake);
+          if (dealt > 0) this.registerComboHit(140);
+          hit = true;
+        }
+        if (hit || p.life <= 0) {
+          this.projectiles.splice(i, 1);
+        }
+        continue;
+      }
+
       if (p.isEnemy && this.player.checkAABB(this.player, p)) {
         const dmg = this.player.takeDamage(p.damage, this.sound, this.screenShake);
         if (dmg > 0) {
+          this.combo.count = 0;
+          this.combo.timer = 0;
           this.particles.createDamageNumber(this.player.x, this.player.y - 10, dmg, '#ff1744');
         }
         this.projectiles.splice(i, 1);
@@ -361,6 +399,14 @@ class Game {
     }
   }
 
+  registerComboHit(baseScore) {
+    this.combo.count += 1;
+    this.combo.timer = this.combo.maxTimer;
+    const mult = 1 + Math.min(3, Math.floor(this.combo.count / 3)) * 0.5;
+    this.stats.score += Math.floor(baseScore * mult);
+    this.stats.maxCombo = Math.max(this.stats.maxCombo, this.combo.count);
+  }
+
   checkPlayerAttackCollisions() {
     const atk = this.player.attackHitbox;
 
@@ -369,10 +415,9 @@ class Game {
         this.player.enemiesHitThisAttack.add(e);
         const dealt = e.takeDamage(atk.damage, this.player.facing, this.particles, this.sound);
         if (dealt > 0) {
-          this.hitstopTimer = 0.045;
-          this.screenShake.trigger(4, 0.15);
-          this.stats.score += 50 * atk.step;
-          this.stats.maxCombo = Math.max(this.stats.maxCombo, atk.step);
+          this.hitstopTimer = atk.step === 3 ? 0.065 : 0.045;
+          this.screenShake.trigger(atk.step === 3 ? 7 : 4, 0.16);
+          this.registerComboHit(50 * atk.step);
         }
       }
     }
@@ -383,9 +428,9 @@ class Game {
         const isGold = this.player.armorTier === 'gold';
         const dealt = this.boss.takeDamage(atk.damage, isGold, this.particles, this.sound, this.screenShake);
         if (dealt > 0) {
-          this.hitstopTimer = 0.06;
-          this.screenShake.trigger(7, 0.2);
-          this.stats.score += 120 * atk.step;
+          this.hitstopTimer = atk.step === 3 ? 0.08 : 0.06;
+          this.screenShake.trigger(atk.step === 3 ? 10 : 7, 0.22);
+          this.registerComboHit(120 * atk.step);
         }
       }
     }
@@ -632,7 +677,7 @@ class Game {
       this.boss.renderBossHealthBar(this.ctx, this.width);
     }
     if (this.state === 'PLAYING' || this.state === 'BOSS_FIGHT') {
-      WorldRenderer.renderGameplayIndicators(this.ctx, this.player);
+      WorldRenderer.renderGameplayIndicators(this.ctx, this.player, this.combo, this.width);
       WorldRenderer.renderZoneBanner(this.ctx, this.zoneBanner, this.width);
     }
     if (this.state === 'MENTOR_DIALOG') {

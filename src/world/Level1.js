@@ -70,6 +70,10 @@ export function buildLevel1(levelWidth, height) {
   collectibles.push({ type: 'coffee', x: 2600, y: groundY - 165, width: 24, height: 24 });
   collectibles.push({ type: 'book', x: 3100, y: groundY - 50, width: 24, height: 24 });
 
+  // Plataforma Secreta Alta (Zona 2 - exige Pulo Duplo + Dash)
+  platforms.push({ x: 2740, y: groundY - 215, width: 110, height: 20 });
+  collectibles.push({ type: 'book', x: 2782, y: groundY - 252, width: 24, height: 24, xpBonus: 120 });
+
   mentors.push(new Mentor(2400, groundY - 56, 'mentor_2', {
     lines: [
       'Impressionante! Você superou o ciclo dos tutoriais sem fim!',
@@ -98,6 +102,10 @@ export function buildLevel1(levelWidth, height) {
 
   collectibles.push({ type: 'coffee', x: 3650, y: groundY - 130, width: 24, height: 24 });
   collectibles.push({ type: 'book', x: 4230, y: groundY - 110, width: 24, height: 24 });
+
+  // Plataforma Secreta Alta (Zona 3 - Café Dourado antes do Boss)
+  platforms.push({ x: 3740, y: groundY - 220, width: 110, height: 20 });
+  collectibles.push({ type: 'coffee', x: 3782, y: groundY - 256, width: 24, height: 24, healBonus: 60 });
 
   const boss = new Boss(4750, groundY - 130);
 

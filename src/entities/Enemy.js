@@ -108,7 +108,9 @@ export class Enemy {
       const isLunge = absDist < 230;
       this.isAlert = isLunge;
       const currentSpeed = isLunge ? this.speed * 1.75 : this.speed;
-      this.facing = distToPlayer > 0 ? 1 : -1;
+      if (absDist > 12) {
+        this.facing = distToPlayer > 0 ? 1 : -1;
+      }
       this.vx = this.facing * currentSpeed;
       this.vy += 1200 * dt;
 
@@ -142,7 +144,9 @@ export class Enemy {
       }
     } else if (this.type === 'golem') {
       this.isAlert = absDist < 260;
-      this.facing = distToPlayer > 0 ? 1 : -1;
+      if (absDist > 12) {
+        this.facing = distToPlayer > 0 ? 1 : -1;
+      }
       this.vx = this.facing * this.speed;
       this.vy += 1200 * dt;
       this.moveAndCollide(dt, platforms);

@@ -27,10 +27,22 @@ export class OverlayScreens {
     `;
     overlay.classList.remove('hidden');
 
-    document.getElementById('btnSaveScore').addEventListener('click', () => {
+    const submit = () => {
       const input = document.getElementById('playerInitials');
       onSave(input ? input.value : 'DEV');
-    });
+    };
+
+    document.getElementById('btnSaveScore').addEventListener('click', submit);
+    const initialsInput = document.getElementById('playerInitials');
+    if (initialsInput) {
+      initialsInput.focus();
+      initialsInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          submit();
+        }
+      });
+    }
   }
 
   static showGameOver({ score, activeCheckpoint, onContinue, onRetry }) {

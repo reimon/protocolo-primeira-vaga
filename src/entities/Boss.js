@@ -29,10 +29,26 @@ export class Boss {
     this.attackCycle = 0;
     this.slamVy = 0;
     this.isSlamming = false;
+    this.laserTimer = 0.45;
+    this.deathExplosionCount = 0;
+    this.deathExplosionTimer = 0;
   }
 
   update(dt, player, platforms, projectiles, enemies, soundEngine, particleSystem, screenShake, onMentorIntervention) {
-    if (this.isDead) return;
+    if (this.isDead) {
+      if (this.deathExplosionCount > 0 && particleSystem) {
+        this.deathExplosionTimer -= dt;
+        if (this.deathExplosionTimer <= 0) {
+          this.deathExplosionTimer = 0.2;
+          this.deathExplosionCount--;
+          particleSystem.createExplosion(
+            this.x + Math.random() * this.width,
+            this.y + Math.random() * this.height
+          );
+        }
+      }
+      return;
+    }
 
     if (this.hitTimer > 0) this.hitTimer -= dt;
     this.hoverTimer += dt * 2.5;
@@ -63,8 +79,10 @@ export class Boss {
 
       case 'laser_barrage':
         this.y = this.baseY + Math.sin(this.hoverTimer) * 6;
-        // Dispara lasers periódicos
-        if (Math.random() < (this.phase === 2 ? 0.08 : 0.045)) {
+        // Dispara lasers em intervalo fixo baseado em dt (independente de Hz do monitor)
+        this.laserTimer -= dt;
+        if (this.laserTimer <= 0) {
+          this.laserTimer = this.phase === 2 ? 0.32 : 0.50;
           this.fireResumeLaser(projectiles, player, soundEngine);
         }
         if (this.stateTimer <= 0) {
@@ -249,18 +267,10 @@ export class Boss {
     if (this.hp <= 0) {
       this.hp = 0;
       this.isDead = true;
+      this.deathExplosionCount = 5;
+      this.deathExplosionTimer = 0;
       soundEngine.playEnemyDeath();
       screenShake.trigger(20, 1.0);
-      if (particleSystem) {
-        for (let i = 0; i < 5; i++) {
-          setTimeout(() => {
-            particleSystem.createExplosion(
-              this.x + Math.random() * this.width,
-              this.y + Math.random() * this.height
-            );
-          }, i * 200);
-        }
-      }
     }
 
     return finalDamage;
@@ -290,6 +300,19 @@ export class Boss {
     const sprite = renderer.get(spriteKey) || renderer.get('boss_ats_idle');
     const screenX = this.x - cameraX;
     const screenY = this.y;
+
+    // Telegraph de Ground Slam (zona de perigo no chão + ícone !)
+    if (this.state === 'ground_slam' && !this.isSlamming) {
+      const pulse = 0.5 + 0.5 * Math.sin(Date.now() * 0.02);
+      ctx.save();
+      ctx.fillStyle = `rgba(255, 23, 68, ${0.25 + 0.35 * pulse})`;
+      ctx.fillRect(screenX - 20, this.baseY + this.height - 6, this.width + 40, 10);
+      ctx.fillStyle = '#ff1744';
+      ctx.font = 'bold 20px "Press Start 2P", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('!', screenX + this.width / 2, screenY - 12);
+      ctx.restore();
+    }
 
     // Sombra projetada do Boss no calçadão
     ctx.save();

@@ -238,4 +238,45 @@ export class InputController {
       });
     }
   }
+
+  static pollGamepad(game) {
+    if (typeof navigator === 'undefined' || !navigator.getGamepads) return;
+    const pads = navigator.getGamepads();
+    const gp = pads && pads[0];
+    if (!gp) return;
+
+    if (!InputController._prevPad) {
+      InputController._prevPad = { jump: false, attack: false, dash: false, start: false };
+    }
+    const prev = InputController._prevPad;
+
+    const axisX = gp.axes[0] || 0;
+    const dpadLeft = gp.buttons[14]?.pressed;
+    const dpadRight = gp.buttons[15]?.pressed;
+
+    if (axisX < -0.35 || dpadLeft) game.input.left = true;
+    else if (axisX > 0.35 || dpadRight) game.input.right = true;
+
+    const jumpDown = !!gp.buttons[0]?.pressed;
+    const attackDown = !!gp.buttons[2]?.pressed;
+    const dashDown = !!(gp.buttons[1]?.pressed || gp.buttons[5]?.pressed);
+    const startDown = !!gp.buttons[9]?.pressed;
+
+    if (jumpDown) game.input.jump = true;
+    if (jumpDown && !prev.jump) {
+      if (game.state === 'MENTOR_DIALOG') game.advanceDialog();
+      else game.input.jumpPressed = true;
+    }
+    if (attackDown && !prev.attack) game.input.attackPressed = true;
+    if (dashDown && !prev.dash) game.input.dashPressed = true;
+    if (startDown && !prev.start) {
+      if (game.state === 'PLAYING' || game.state === 'BOSS_FIGHT') game.openSettings();
+      else if (game.state === 'SETTINGS') game.closeSettings();
+    }
+
+    prev.jump = jumpDown;
+    prev.attack = attackDown;
+    prev.dash = dashDown;
+    prev.start = startDown;
+  }
 }

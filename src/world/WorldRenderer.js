@@ -92,6 +92,19 @@ export class WorldRenderer {
 
   static renderProjectiles(ctx, renderer, projectiles, cameraX) {
     for (const p of projectiles) {
+      if (p.type === 'code_wave') {
+        const sx = p.x - cameraX;
+        ctx.save();
+        ctx.shadowColor = '#00e5ff';
+        ctx.shadowBlur = 12;
+        ctx.fillStyle = '#00e5ff';
+        ctx.fillRect(sx, p.y + 4, p.width, p.height - 8);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(sx + 4, p.y + 8, p.width - 8, p.height - 16);
+        ctx.restore();
+        continue;
+      }
+
       let spriteKey = 'proj_filter';
       if (p.type === 'ghosting') spriteKey = 'proj_ghosting';
       if (p.type === 'shockwave') spriteKey = 'proj_shockwave';
@@ -106,7 +119,7 @@ export class WorldRenderer {
     }
   }
 
-  static renderGameplayIndicators(ctx, player) {
+  static renderGameplayIndicators(ctx, player, combo = null, width = 1280) {
     if (!player) return;
     ctx.save();
     const x = 18;
@@ -135,6 +148,33 @@ export class WorldRenderer {
       ctx.strokeRect(x + 136, y, 112, 22);
       ctx.fillStyle = '#ffd700';
       ctx.fillText('2X JUMP', x + 148, y + 15);
+    }
+
+    // Contador de Combo em Tempo Real
+    if (combo && combo.count >= 2 && combo.timer > 0) {
+      const cx = width - 210;
+      const cy = 94;
+      const decayPct = Math.max(0, combo.timer / combo.maxTimer);
+      const mult = (1 + Math.min(3, Math.floor(combo.count / 3)) * 0.5).toFixed(1);
+
+      ctx.fillStyle = 'rgba(10, 14, 26, 0.85)';
+      ctx.fillRect(cx, cy, 192, 34);
+      ctx.strokeStyle = '#ffd700';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(cx, cy, 192, 34);
+
+      ctx.fillStyle = '#ffd700';
+      ctx.font = '10px "Press Start 2P", monospace';
+      ctx.fillText(`COMBO x${combo.count}`, cx + 10, cy + 16);
+
+      ctx.fillStyle = '#00e5ff';
+      ctx.font = '8px "Press Start 2P", monospace';
+      ctx.fillText(`${mult}x PTS`, cx + 124, cy + 16);
+
+      ctx.fillStyle = '#263238';
+      ctx.fillRect(cx + 8, cy + 23, 176, 6);
+      ctx.fillStyle = '#ff9100';
+      ctx.fillRect(cx + 8, cy + 23, Math.floor(176 * decayPct), 6);
     }
     ctx.restore();
   }
