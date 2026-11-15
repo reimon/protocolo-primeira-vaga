@@ -74,3 +74,13 @@
 - [x] **S3.3 Ciclos de 4 Frames e Estados Reativos em Todos os Inimigos (`lunge`, `noshield`, `charge`)** (`src/assets/PixelRenderer.js`, `src/entities/Enemy.js`)
 - [x] **S3.4 Sprites Hi-Bit para Caixas, Pickups `[F]`/`[G]`, `Git Bomb` e POWs Animados com `bg_npc_*`** (`src/assets/PixelRenderer.js`, `src/world/WorldRenderer.js`, `src/world/Level1.js`)
 - [x] **S3.5 Cobertura de Testes e Validação via `node tests/run-tests.mjs`**
+
+---
+
+# 💥 Pilar B: Destrutibilidade, Explosões e "Juice" Visual
+
+> **Objetivo:** Transformar o impacto de combate e a interação com o cenário com explosões volumétricas em camadas, reação em cadeia, destrutíveis multi-hit e marcas permanentes no solo.
+
+- [x] **PB.1 Explosões Volumétricas, Anéis de Onda de Choque, Marcas de Chamuscado & Screen Flash** (`src/world/ParticleSystem.js`, `src/entities/Enemy.js`, `src/entities/Boss.js`)
+- [x] **PB.2 Barris Explosivos com Reação em Cadeia, Caixas Blindadas Multi-Hit & Servidores Corporativos** (`src/world/Destructibles.js`, `src/world/Level1.js`, `src/assets/PixelRenderer.js`, `src/world/WorldRenderer.js`, `src/main.js`)
+- [x] **PB.3 Cobertura de Testes do Pilar B em `src/tests/SelfTest.js` (`node tests/run-tests.mjs`)**

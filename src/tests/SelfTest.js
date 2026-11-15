@@ -14,6 +14,7 @@ import { LoadingScene } from '../world/LoadingScene.js';
 import { LeaderboardService } from '../services/LeaderboardService.js';
 import { buildLevel1 } from '../world/Level1.js';
 import { ParticleSystem } from '../world/ParticleSystem.js';
+import { hitDestructible } from '../world/Destructibles.js';
 
 export class SelfTest {
   static runAll() {
@@ -245,6 +246,62 @@ export class SelfTest {
       assert('Sprites Hi-Bit gerados para caixas, pickups [F]/[G] e Git Bomb',
         !!renderer.get('item_crate') && !!renderer.get('item_pickup_f_2') &&
         !!renderer.get('item_pickup_g_2') && !!renderer.get('proj_git_bomb_2')
+      );
+
+      // 15. Testes Pilar B: Destrutibilidade, Explosões em Camadas e Juice Visual
+      assert('Sprites Hi-Bit gerados para caixa rachada, barris explosivos e servidores',
+        !!renderer.get('item_crate_dmg') && !!renderer.get('item_barrel_1') &&
+        !!renderer.get('item_barrel_2') && !!renderer.get('item_server_ok') &&
+        !!renderer.get('item_server_dmg')
+      );
+
+      const psB = new ParticleSystem();
+      psB.createExplosion(200, 520, 1.2, 560);
+      psB.triggerScreenFlash('#ff9100', 0.3, 0.08);
+      assert('Explosão Pilar B gera ondas de choque, plumas volumétricas, marca no chão e flash de tela',
+        psB.shockwaves.length >= 1 && psB.plumes.length >= 4 &&
+        psB.scorchMarks.length >= 1 && psB.screenFlash !== null
+      );
+      psB.update(0.1, 560);
+      assert('ScreenFlash decai e limpa após duração configurada', psB.screenFlash === null);
+
+      const chainWorld = {
+        height: 720,
+        state: 'PLAYING',
+        enemies: [new Enemy('golem', 330, 510)],
+        crates: [
+          { kind: 'armored_crate', x: 100, y: 526, width: 34, height: 34, hp: 2, maxHp: 2, hitTimer: 0, destroyed: false, drop: 'coffee' },
+          { kind: 'barrel', x: 280, y: 526, width: 34, height: 34, hp: 1, maxHp: 1, hitTimer: 0, destroyed: false, explosive: true },
+          { kind: 'barrel', x: 320, y: 526, width: 34, height: 34, hp: 1, maxHp: 1, hitTimer: 0, destroyed: false, explosive: true }
+        ],
+        pows: [],
+        collectibles: [],
+        particles: new ParticleSystem(),
+        sound,
+        screenShake: { trigger: () => {} },
+        stats: { score: 0, devsRescued: 0 },
+        player: { facing: 1, armorTier: 'base' },
+        registerComboHit: () => {},
+        onHitstop: () => {}
+      };
+      hitDestructible(chainWorld, chainWorld.crates[0]);
+      assert('Caixa blindada (hp=2) racha no 1º golpe sem destruir e ativa hitTimer',
+        chainWorld.crates[0].hp === 1 && !chainWorld.crates[0].destroyed && chainWorld.crates[0].hitTimer > 0
+      );
+      hitDestructible(chainWorld, chainWorld.crates[0]);
+      assert('Caixa blindada quebra no 2º golpe e solta drop',
+        chainWorld.crates[0].destroyed === true && chainWorld.collectibles.length === 1 && chainWorld.stats.score === 100
+      );
+
+      hitDestructible(chainWorld, chainWorld.crates[1]);
+      assert('Barril explosivo detona em cadeia em barril vizinho e quebra escudo do Golem',
+        chainWorld.crates[1].destroyed === true && chainWorld.crates[2].destroyed === true &&
+        chainWorld.enemies[0].hasFrontShield === false
+      );
+
+      assert('Level1 possui barris explosivos e servidores/caixas multi-hit',
+        level.crates.some(c => c.kind === 'barrel' && c.explosive) &&
+        level.crates.some(c => (c.maxHp || 1) >= 2)
       );
 
     } catch (error) {

@@ -232,13 +232,26 @@ export class Enemy {
 
     if (this.hp <= 0) {
       this.isDead = true;
-      if (soundEngine) soundEngine.playEnemyDeath();
-      if (particleSystem) {
-        particleSystem.createExplosion(this.x + this.width / 2, this.y + this.height / 2);
-      }
+      this.triggerDeathFX(particleSystem, soundEngine);
     }
 
     return amount;
+  }
+
+  triggerDeathFX(particleSystem, soundEngine) {
+    if (soundEngine) soundEngine.playEnemyDeath();
+    if (!particleSystem) return;
+    const cx = this.x + this.width / 2;
+    const cy = this.y + this.height / 2;
+    particleSystem.createExplosion(cx, cy, this.type === 'golem' ? 1.2 : 0.95);
+    const debColors = this.type === 'bug'
+      ? ['#00e676', '#ff1744', '#141013']
+      : this.type === 'ghost'
+        ? ['#80deea', '#ffffff', '#7c4dff']
+        : this.type === 'golem'
+          ? ['#ffd700', '#78909c', '#37474f']
+          : ['#00e5ff', '#cfd8dc', '#ff5252'];
+    particleSystem.createDebris(cx, cy, debColors, this.type === 'golem' ? 8 : 5);
   }
 
   moveAndCollide(dt, platforms) {
@@ -295,8 +308,13 @@ export class Enemy {
     this.stunTimer = 0.45;
     if (soundEngine) soundEngine.playDeflect();
     if (particleSystem) {
-      particleSystem.createDebris(this.x + this.width / 2, this.y + this.height / 2, ['#ffd700', '#fff59d', '#ff9100'], 8);
-      particleSystem.createDamageNumber(this.x + this.width / 2, this.y - 18, 'ESCUDO QUEBRADO!', '#ffd700');
+      const cx = this.x + this.width / 2;
+      const cy = this.y + this.height / 2;
+      particleSystem.createDebris(cx, cy, ['#ffd700', '#fff59d', '#ff9100'], 10);
+      if (particleSystem.createShockwaveRing) {
+        particleSystem.createShockwaveRing(cx, cy, 56, '#ffd700', 0.24);
+      }
+      particleSystem.createDamageNumber(cx, this.y - 18, 'ESCUDO QUEBRADO!', '#ffd700');
     }
     return true;
   }
@@ -339,10 +357,7 @@ export class Enemy {
 
     if (this.hp <= 0) {
       this.isDead = true;
-      if (soundEngine) soundEngine.playEnemyDeath();
-      if (particleSystem) {
-        particleSystem.createExplosion(this.x + this.width / 2, this.y + this.height / 2);
-      }
+      this.triggerDeathFX(particleSystem, soundEngine);
     }
 
     return amount;

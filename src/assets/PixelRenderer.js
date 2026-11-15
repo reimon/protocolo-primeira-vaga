@@ -98,7 +98,9 @@ export class PixelRenderer {
       { key: 'bg_npc_dev', path: 'assets/sprites/bg_npc_dev_frames.png' },
       { key: 'bg_npc_woman', path: 'assets/sprites/bg_npc_woman_frames.png' },
       { key: 'bg_npc_commuter', path: 'assets/sprites/bg_npc_commuter_frames.png' },
-      { key: 'bg_npc_exec', path: 'assets/sprites/bg_npc_exec_frames.png' }
+      { key: 'bg_npc_exec', path: 'assets/sprites/bg_npc_exec_frames.png' },
+      { key: 'crate_supply', path: 'assets/sprites/crate_supply.png' },
+      { key: 'pow_cage', path: 'assets/sprites/pow_cage.png' }
     ];
 
     await Promise.all(list.map(item => new Promise((resolve) => {
@@ -975,6 +977,78 @@ export class PixelRenderer {
     crCtx.fillRect(3, 29, 2, 2);
     crCtx.fillRect(29, 29, 2, 2);
     this.set('item_crate', crate);
+
+    // 4b. Caixa Rachada / Danificada (34x34)
+    const { canvas: crateDmg, ctx: cdCtx } = this.createCanvas(34, 34);
+    cdCtx.drawImage(crate, 0, 0);
+    cdCtx.fillStyle = '#141013';
+    cdCtx.fillRect(9, 7, 3, 7);
+    cdCtx.fillRect(12, 13, 4, 4);
+    cdCtx.fillRect(16, 16, 3, 8);
+    cdCtx.fillRect(20, 9, 4, 3);
+    cdCtx.fillStyle = '#ff9100';
+    cdCtx.fillRect(13, 14, 2, 2);
+    this.set('item_crate_dmg', crateDmg);
+
+    // 4c. Barril Explosivo Hi-Bit estilo Metal Slug (34x34, 2 frames de alerta)
+    [1, 2].forEach((frame) => {
+      const { canvas: barrel, ctx: brCtx } = this.createCanvas(34, 34);
+      brCtx.fillStyle = this.palette.outline;
+      brCtx.fillRect(4, 1, 26, 32);
+      brCtx.fillStyle = '#b71c1c';
+      brCtx.fillRect(6, 3, 22, 28);
+      // Realce cilíndrico e sombra
+      brCtx.fillStyle = '#ef5350';
+      brCtx.fillRect(8, 4, 6, 26);
+      brCtx.fillStyle = '#7f0000';
+      brCtx.fillRect(22, 4, 6, 26);
+      // Aros de ferro
+      brCtx.fillStyle = '#455a64';
+      brCtx.fillRect(5, 3, 24, 3);
+      brCtx.fillRect(5, 11, 24, 3);
+      brCtx.fillRect(5, 20, 24, 3);
+      brCtx.fillRect(5, 28, 24, 3);
+      // Faixa amarela de perigo + LED piscando
+      brCtx.fillStyle = frame === 1 ? '#ffd600' : '#ff6d00';
+      brCtx.fillRect(10, 14, 14, 6);
+      brCtx.fillStyle = '#141013';
+      brCtx.fillRect(13, 15, 2, 4);
+      brCtx.fillRect(19, 15, 2, 4);
+      brCtx.fillStyle = frame === 1 ? '#ffffff' : '#ff1744';
+      brCtx.fillRect(16, 6, 3, 3);
+      this.set(`item_barrel_${frame}`, barrel);
+    });
+
+    // 4d. Servidor Corporativo Destrutível (36x42, estado ok e danificado)
+    [
+      { key: 'item_server_ok', dmg: false },
+      { key: 'item_server_dmg', dmg: true }
+    ].forEach(({ key, dmg }) => {
+      const { canvas: srv, ctx: svCtx } = this.createCanvas(36, 42);
+      svCtx.fillStyle = this.palette.outline;
+      svCtx.fillRect(2, 1, 32, 40);
+      svCtx.fillStyle = '#263238';
+      svCtx.fillRect(4, 3, 28, 36);
+      svCtx.fillStyle = '#37474f';
+      svCtx.fillRect(6, 5, 24, 10);
+      svCtx.fillRect(6, 17, 24, 10);
+      svCtx.fillRect(6, 29, 24, 8);
+      // LEDs do rack
+      svCtx.fillStyle = dmg ? '#ff1744' : '#00e676';
+      svCtx.fillRect(8, 8, 3, 3);
+      svCtx.fillRect(13, 8, 3, 3);
+      svCtx.fillStyle = dmg ? '#ff9100' : '#00e5ff';
+      svCtx.fillRect(8, 20, 14, 3);
+      svCtx.fillRect(8, 32, 10, 2);
+      if (dmg) {
+        svCtx.fillStyle = '#141013';
+        svCtx.fillRect(18, 6, 3, 12);
+        svCtx.fillRect(21, 16, 4, 9);
+        svCtx.fillStyle = '#ffea00';
+        svCtx.fillRect(20, 14, 3, 3);
+      }
+      this.set(key, srv);
+    });
 
     // 5. Pickups por Letra estilo Metal Slug ([F] e [G], 2 frames com brilho)
     [

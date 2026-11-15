@@ -113,19 +113,25 @@ export function buildLevel1(levelWidth, height) {
   platforms.push({ x: 4470, y: groundY - 95, width: 135, height: 20 });
   platforms.push({ x: 4645, y: groundY - 165, width: 120, height: 20 });
 
-  // Caixas Destrutíveis (Legacy Crates com drops estilo Metal Slug)
-  crates.push({ x: 380, y: groundY - 34, width: 34, height: 34, hp: 1, destroyed: false, label: 'LEGACY', drop: 'pickup_f' });
-  crates.push({ x: 930, y: groundY - 34, width: 34, height: 34, hp: 1, destroyed: false, label: 'PDFs', drop: 'coffee' });
-  crates.push({ x: 1860, y: groundY - 34, width: 34, height: 34, hp: 1, destroyed: false, label: 'GIT', drop: 'pickup_g' });
-  crates.push({ x: 2910, y: groundY - 104, width: 34, height: 34, hp: 1, destroyed: false, label: 'NPM', drop: 'pickup_f' });
-  crates.push({ x: 3670, y: groundY - 124, width: 34, height: 34, hp: 1, destroyed: false, label: 'DEPLOY', drop: 'pickup_g' });
-  crates.push({ x: 4250, y: groundY - 109, width: 34, height: 34, hp: 1, destroyed: false, label: 'HOTFIX', drop: 'coffee' });
+  // Caixas, Barris Explosivos & Servidores Destrutíveis (Pilar B estilo Metal Slug)
+  crates.push({ kind: 'crate', x: 380, y: groundY - 34, width: 34, height: 34, hp: 1, maxHp: 1, hitTimer: 0, destroyed: false, label: 'LEGACY', drop: 'pickup_f' });
+  crates.push({ kind: 'barrel', x: 810, y: groundY - 34, width: 34, height: 34, hp: 1, maxHp: 1, hitTimer: 0, destroyed: false, explosive: true, label: 'HOTFIX-TNT', drop: null });
+  crates.push({ kind: 'crate', x: 930, y: groundY - 34, width: 34, height: 34, hp: 1, maxHp: 1, hitTimer: 0, destroyed: false, label: 'PDFs', drop: 'coffee' });
+  crates.push({ kind: 'server', x: 1150, y: groundY - 42, width: 36, height: 42, hp: 2, maxHp: 2, hitTimer: 0, destroyed: false, label: 'PROXY', drop: 'book' });
+  crates.push({ kind: 'armored_crate', x: 1860, y: groundY - 34, width: 34, height: 34, hp: 2, maxHp: 2, hitTimer: 0, destroyed: false, label: 'MONOLITO', drop: 'pickup_g' });
+  crates.push({ kind: 'barrel', x: 2205, y: groundY - 34, width: 34, height: 34, hp: 1, maxHp: 1, hitTimer: 0, destroyed: false, explosive: true, label: 'PROD-DB', drop: null });
+  crates.push({ kind: 'crate', x: 2910, y: groundY - 104, width: 34, height: 34, hp: 1, maxHp: 1, hitTimer: 0, destroyed: false, label: 'NPM', drop: 'pickup_f' });
+  crates.push({ kind: 'server', x: 2960, y: groundY - 42, width: 36, height: 42, hp: 2, maxHp: 2, hitTimer: 0, destroyed: false, label: 'CI/CD', drop: 'coffee' });
+  crates.push({ kind: 'armored_crate', x: 3670, y: groundY - 124, width: 34, height: 34, hp: 2, maxHp: 2, hitTimer: 0, destroyed: false, label: 'DOCKER', drop: 'pickup_g' });
+  crates.push({ kind: 'barrel', x: 3915, y: groundY - 34, width: 34, height: 34, hp: 1, maxHp: 1, hitTimer: 0, destroyed: false, explosive: true, label: 'OVERCLOCK', drop: null });
+  crates.push({ kind: 'crate', x: 4250, y: groundY - 109, width: 34, height: 34, hp: 1, maxHp: 1, hitTimer: 0, destroyed: false, label: 'HOTFIX', drop: 'coffee' });
+  crates.push({ kind: 'server', x: 4540, y: groundY - 42, width: 36, height: 42, hp: 2, maxHp: 2, hitTimer: 0, destroyed: false, label: 'ATS-CACHE', drop: 'pickup_g' });
 
   // Prisioneiros POWs ("Devs Presos no Loop de Tutoriais")
   pows.push({ x: 520, y: groundY - 165, width: 34, height: 40, rescued: false, runTimer: 0, spriteKey: 'bg_npc_dev', quip: 'Saí do tutorial infinito!', drop: 'pickup_f' });
   pows.push({ x: 2260, y: groundY - 125, width: 34, height: 40, rescued: false, runTimer: 0, spriteKey: 'bg_npc_woman', quip: 'Valeu por quebrar o Golem!', drop: 'pickup_g' });
   pows.push({ x: 2770, y: groundY - 255, width: 34, height: 40, rescued: false, runTimer: 0, spriteKey: 'bg_npc_commuter', quip: 'Commit salvo! Toma café!', drop: 'coffee' });
-  pows.push({ x: 4510, y: groundY - 135, width: 34, height: 40, rescued: false, runTimer: 0, spriteKey: 'bg_npc_dev', quip: 'Derrote o ATS-9000!', drop: 'pickup_f' });
+  pows.push({ x: 4510, y: groundY - 135, width: 34, height: 40, rescued: false, runTimer: 0, spriteKey: 'bg_npc_exec', quip: 'Derrote o ATS-9000!', drop: 'pickup_f' });
 
   const boss = new Boss(4750, groundY - 130);
 

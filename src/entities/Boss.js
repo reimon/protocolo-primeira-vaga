@@ -60,8 +60,17 @@ export class Boss {
         if (this.deathTimer <= 0) {
           this.deathFinished = true;
           if (particleSystem) {
-            particleSystem.createExplosion(this.x + this.width / 2, this.y + this.height / 2, 1.85);
-            particleSystem.createDamageNumber(this.x + this.width / 2, this.y - 16, 'ATS-9000 DESTRUÍDO!', '#ffd700');
+            const cx = this.x + this.width / 2;
+            const cy = this.y + this.height / 2;
+            particleSystem.createExplosion(cx, cy, 1.85);
+            particleSystem.createDebris(cx, cy, ['#ffd700', '#ff6d00', '#cfd8dc', '#37474f'], 16);
+            if (particleSystem.createShockwaveRing) {
+              particleSystem.createShockwaveRing(cx, cy, 150, '#ffd600', 0.42);
+            }
+            if (particleSystem.triggerScreenFlash) {
+              particleSystem.triggerScreenFlash('#ffffff', 0.5, 0.18);
+            }
+            particleSystem.createDamageNumber(cx, this.y - 16, 'ATS-9000 DESTRUÍDO!', '#ffd700');
           }
           if (screenShake) screenShake.trigger(22, 0.8);
           if (soundEngine) soundEngine.playEnemyDeath();
@@ -142,7 +151,13 @@ export class Boss {
             soundEngine.playHit();
             this.createShockwaves(projectiles);
             if (particleSystem) {
-              particleSystem.createExplosion(this.x + this.width / 2, this.y + this.height);
+              const cx = this.x + this.width / 2;
+              const cy = this.y + this.height;
+              particleSystem.createExplosion(cx, cy, 1.15, this.baseY + this.height);
+              particleSystem.createDust(cx, cy, 10);
+              if (particleSystem.createShockwaveRing) {
+                particleSystem.createShockwaveRing(cx, cy - 6, 110, '#ff1744', 0.34);
+              }
             }
             // Fica vulnerável após o Slam!
             this.state = 'recovering';
@@ -334,6 +349,12 @@ export class Boss {
       this.moduleBroken = true;
       if (particleSystem) {
         particleSystem.createExplosion(this.x + 28, this.y + 38, 0.9);
+        if (particleSystem.createShockwaveRing) {
+          particleSystem.createShockwaveRing(this.x + 28, this.y + 38, 72, '#ff9100', 0.3);
+        }
+        if (particleSystem.triggerScreenFlash) {
+          particleSystem.triggerScreenFlash('#ff9100', 0.25, 0.1);
+        }
         particleSystem.createDamageNumber(this.x + 40, this.y - 26, 'FILTRO QUEBRADO!', '#ff9100');
       }
       screenShake.trigger(12, 0.35);

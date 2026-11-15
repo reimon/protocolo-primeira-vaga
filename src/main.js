@@ -10,6 +10,7 @@ import { ParticleSystem, ScreenShake } from './world/ParticleSystem.js';
 import { LoadingScene } from './world/LoadingScene.js';
 import { buildLevel1 } from './world/Level1.js';
 import { WorldRenderer } from './world/WorldRenderer.js';
+import { updateDestructibles, hitDestructible, rescuePow as rescuePowEntity, explodeArea } from './world/Destructibles.js';
 import { Player } from './entities/Player.js';
 import { Boss } from './entities/Boss.js';
 import { InputController } from './input/InputController.js';
@@ -286,6 +287,7 @@ class Game {
     }
 
     this.updatePows(worldDt);
+    this.updateCrates(worldDt);
     this.updateZoneProgress();
     this.updateCheckpoints();
     this.updateHazards();
@@ -338,72 +340,46 @@ class Game {
     }
   }
 
-  breakCrate(crate) {
-    if (crate.destroyed) return;
-    crate.destroyed = true;
-    this.sound.playHit();
-    this.stats.score += 100;
-    const cx = crate.x + crate.width / 2;
-    const cy = crate.y + crate.height / 2;
-    this.particles.createDebris(cx, cy, ['#8d6e63', '#ffd54f', '#5d4037'], 7);
-    this.particles.createSparks(cx, cy, '#ffd54f', 8);
-    if (crate.drop) {
-      this.collectibles.push({ type: crate.drop, x: crate.x + 5, y: crate.y + 8, width: 24, height: 24 });
-    }
+  getWorldContext() {
+    return {
+      height: this.height,
+      state: this.state,
+      enemies: this.enemies,
+      boss: this.boss,
+      crates: this.crates,
+      pows: this.pows,
+      collectibles: this.collectibles,
+      particles: this.particles,
+      sound: this.sound,
+      screenShake: this.screenShake,
+      stats: this.stats,
+      player: this.player,
+      registerComboHit: (pts) => this.registerComboHit(pts),
+      onHitstop: (sec) => { this.hitstopTimer = Math.max(this.hitstopTimer, sec); }
+    };
+  }
+
+  updateCrates(dt) {
+    updateDestructibles(this.crates, dt, this.particles);
+  }
+
+  breakCrate(crate, forceDestroy = false) {
+    hitDestructible(this.getWorldContext(), crate, forceDestroy);
   }
 
   rescuePow(pow) {
-    if (pow.rescued) return;
-    pow.rescued = true;
-    pow.runTimer = 1.6;
-    this.stats.devsRescued += 1;
-    this.stats.score += 500;
-    this.sound.playLevelUp();
-    const px = pow.x + pow.width / 2;
-    const py = pow.y + pow.height / 2;
-    this.particles.createSparks(px, py, '#00e676', 14);
-    this.particles.createDamageNumber(px, pow.y - 12, 'POW RESGATADO! +500', '#00e676');
-    if (pow.drop) {
-      this.collectibles.push({ type: pow.drop, x: pow.x + 5, y: pow.y + 14, width: 24, height: 24 });
-    }
+    rescuePowEntity(this.getWorldContext(), pow);
   }
 
   explodeGitBomb(bomb) {
     const cx = bomb.x + bomb.width / 2;
     const cy = bomb.y + bomb.height / 2;
-    this.particles.createExplosion(cx, cy, 1.25);
-    this.screenShake.trigger(10, 0.25);
-    this.sound.playEnemyDeath();
-
-    const blastRadius = 90;
-    for (const e of this.enemies) {
-      if (e.isDead) continue;
-      const dist = Math.hypot((e.x + e.width / 2) - cx, (e.y + e.height / 2) - cy);
-      if (dist <= blastRadius) {
-        if (e.hasFrontShield) e.shatterShield(this.particles, this.sound);
-        const dealt = e.takeDamage(bomb.damage, (e.x + e.width / 2) >= cx ? 1 : -1, this.particles, this.sound);
-        if (dealt > 0) this.registerComboHit(110);
-      }
-    }
-
-    if (this.state === 'BOSS_FIGHT' && this.boss && !this.boss.isDead) {
-      const bDist = Math.hypot((this.boss.x + this.boss.width / 2) - cx, (this.boss.y + this.boss.height / 2) - cy);
-      if (bDist <= blastRadius + 45) {
-        const dealt = this.boss.takeDamage(bomb.damage, this.player.armorTier === 'gold', this.particles, this.sound, this.screenShake);
-        if (dealt > 0) this.registerComboHit(160);
-      }
-    }
-
-    for (const c of this.crates) {
-      if (!c.destroyed && Math.hypot((c.x + c.width / 2) - cx, (c.y + c.height / 2) - cy) <= blastRadius) {
-        this.breakCrate(c);
-      }
-    }
-    for (const pow of this.pows) {
-      if (!pow.rescued && Math.hypot((pow.x + pow.width / 2) - cx, (pow.y + pow.height / 2) - cy) <= blastRadius) {
-        this.rescuePow(pow);
-      }
-    }
+    explodeArea(this.getWorldContext(), cx, cy, {
+      radius: 90,
+      damage: bomb.damage,
+      scale: 1.25,
+      flashColor: '#ffd600'
+    });
   }
 
   updateCollectibles() {
@@ -580,6 +556,12 @@ class Game {
             e.y + e.height / 2,
             (Math.random() > 0.5 ? -0.55 : 0.55),
             68,
+            atk.attackType === 'iaido_blitz' ? '#ff2a85' : '#00e5ff'
+          );
+          this.particles.createImpactBurst(
+            e.x + e.width / 2,
+            e.y + e.height / 2,
+            this.player.facing,
             atk.attackType === 'iaido_blitz' ? '#ff2a85' : '#00e5ff'
           );
         }
@@ -908,6 +890,7 @@ class Game {
     }
 
     this.ctx.restore();
+    this.particles.renderScreenFlash(this.ctx, this.width, this.height);
   }
 }
 

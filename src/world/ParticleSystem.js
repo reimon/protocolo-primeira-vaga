@@ -44,15 +44,57 @@ export class ParticleSystem {
     this.slashLines = [];
     this.flashes = [];
     this.debris = [];
+    this.shockwaves = [];
+    this.plumes = [];
+    this.scorchMarks = [];
+    this.screenFlash = null;
   }
 
   update(dt, groundY = 560) {
+    // Atualiza Flash de Tela
+    if (this.screenFlash) {
+      this.screenFlash.life -= dt;
+      if (this.screenFlash.life <= 0) {
+        this.screenFlash = null;
+      }
+    }
+
     // Atualiza Flashes de Explosão
     for (let i = this.flashes.length - 1; i >= 0; i--) {
       const f = this.flashes[i];
       f.life -= dt;
       if (f.life <= 0) {
         this.flashes.splice(i, 1);
+      }
+    }
+
+    // Atualiza Anéis de Onda de Choque
+    for (let i = this.shockwaves.length - 1; i >= 0; i--) {
+      const sw = this.shockwaves[i];
+      sw.life -= dt;
+      if (sw.life <= 0) {
+        this.shockwaves.splice(i, 1);
+      }
+    }
+
+    // Atualiza Nuvens Volumétricas de Fogo/Fumaça
+    for (let i = this.plumes.length - 1; i >= 0; i--) {
+      const pl = this.plumes[i];
+      pl.x += pl.vx * dt;
+      pl.y += pl.vy * dt;
+      pl.vx *= 0.96;
+      pl.life -= dt;
+      if (pl.life <= 0) {
+        this.plumes.splice(i, 1);
+      }
+    }
+
+    // Atualiza Marcas de Chamuscado no Chão
+    for (let i = this.scorchMarks.length - 1; i >= 0; i--) {
+      const sc = this.scorchMarks[i];
+      sc.life -= dt;
+      if (sc.life <= 0) {
+        this.scorchMarks.splice(i, 1);
       }
     }
 
@@ -186,17 +228,90 @@ export class ParticleSystem {
     }
   }
 
-  createExplosion(x, y, scale = 1) {
-    // Camada 1: Flash branco central (estilo Metal Slug)
+  createShockwaveRing(x, y, maxRadius = 64, color = '#ffd600', duration = 0.26) {
+    this.shockwaves.push({
+      x,
+      y,
+      maxRadius,
+      color,
+      life: duration,
+      maxLife: duration
+    });
+  }
+
+  createScorchMark(x, y = 560, width = 54) {
+    if (this.scorchMarks.length >= 28) {
+      this.scorchMarks.shift();
+    }
+    this.scorchMarks.push({
+      x,
+      y,
+      width,
+      life: 14,
+      maxLife: 14
+    });
+  }
+
+  triggerScreenFlash(color = '#ffffff', alpha = 0.32, duration = 0.1) {
+    this.screenFlash = {
+      color,
+      alpha,
+      life: duration,
+      maxLife: duration
+    };
+  }
+
+  createImpactBurst(x, y, dir = 1, color = '#00e5ff') {
+    this.createShockwaveRing(x, y, 28, color, 0.16);
+    for (let i = 0; i < 8; i++) {
+      const spread = (Math.random() - 0.5) * 1.4;
+      const speed = 110 + Math.random() * 170;
+      this.particles.push({
+        x,
+        y,
+        vx: Math.cos(spread) * speed * (dir || 1),
+        vy: Math.sin(spread) * speed - 30,
+        size: 2 + Math.random() * 2.5,
+        color: i % 2 === 0 ? '#ffffff' : color,
+        life: 0.18 + Math.random() * 0.12,
+        maxLife: 0.3,
+        gravity: 240
+      });
+    }
+  }
+
+  createExplosion(x, y, scale = 1, groundY = 560) {
+    // Camada 1: Flash branco central + Onda de Choque expansiva (estilo Metal Slug)
     this.flashes.push({
       x,
       y,
-      radius: 28 * scale,
-      life: 0.14,
-      maxLife: 0.14
+      radius: 30 * scale,
+      life: 0.16,
+      maxLife: 0.16
     });
+    this.createShockwaveRing(x, y, 62 * scale, scale >= 1.2 ? '#ff9100' : '#ffd600', 0.28);
 
-    // Camada 2: Bola de fogo laranja/vermelho/amarelo
+    // Camada 2: Nuvens volumétricas em camadas (núcleo quente -> fogo -> fumaça escura)
+    const plumeCount = Math.max(4, Math.round(7 * scale));
+    for (let i = 0; i < plumeCount; i++) {
+      const angle = (Math.PI * 2 * i) / plumeCount + (Math.random() * 0.4 - 0.2);
+      const dist = (6 + Math.random() * 16) * scale;
+      const isHot = i % 2 === 0;
+      this.plumes.push({
+        x: x + Math.cos(angle) * dist * 0.5,
+        y: y + Math.sin(angle) * dist * 0.4,
+        vx: Math.cos(angle) * (35 + Math.random() * 55) * scale,
+        vy: Math.sin(angle) * (25 + Math.random() * 45) * scale - 42,
+        startR: 6 * scale,
+        endR: (16 + Math.random() * 10) * scale,
+        color: isHot ? '#ff6d00' : '#455a64',
+        innerColor: isHot ? '#ffea00' : '#78909c',
+        life: isHot ? 0.34 + Math.random() * 0.14 : 0.52 + Math.random() * 0.22,
+        maxLife: isHot ? 0.48 : 0.74
+      });
+    }
+
+    // Camada 3: Faíscas e fragmentos de bola de fogo
     const fireColors = ['#ff1744', '#ff6d00', '#ffd600', '#ffffff'];
     const count = Math.round(24 * scale);
     for (let i = 0; i < count; i++) {
@@ -216,9 +331,12 @@ export class ParticleSystem {
       });
     }
 
-    // Camada 3: Fumaça ascendente + estilhaços quicando
+    // Camada 4: Fumaça ascendente + estilhaços quicando + marca no chão
     this.createSmoke(x, y - 6, Math.round(6 * scale), '#455a64');
-    this.createDebris(x, y, ['#ffd600', '#ff6d00', '#78909c', '#37474f'], Math.round(5 * scale));
+    this.createDebris(x, y, ['#ffd600', '#ff6d00', '#78909c', '#37474f'], Math.round(6 * scale));
+    if (y >= groundY - 120) {
+      this.createScorchMark(x, groundY, Math.round(46 * Math.min(1.8, scale)));
+    }
   }
 
   createDamageNumber(x, y, text, color = '#ffffff') {
@@ -259,6 +377,23 @@ export class ParticleSystem {
   }
 
   render(ctx, cameraX) {
+    // Renderiza Marcas de Chamuscado / Crateras no Chão
+    this.scorchMarks.forEach(sc => {
+      const fade = Math.min(1, sc.life / Math.min(3, sc.maxLife));
+      ctx.save();
+      ctx.globalAlpha = fade * 0.55;
+      ctx.fillStyle = '#0d0f14';
+      ctx.beginPath();
+      ctx.ellipse(sc.x - cameraX, sc.y + 3, sc.width * 0.5, 5.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = fade * 0.35;
+      ctx.fillStyle = '#ff6d00';
+      ctx.beginPath();
+      ctx.ellipse(sc.x - cameraX, sc.y + 3, sc.width * 0.22, 2.2, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    });
+
     // Renderiza Rastros de Dash
     this.ghosts.forEach(g => {
       const alpha = g.life / g.maxLife;
@@ -301,6 +436,23 @@ export class ParticleSystem {
       ctx.restore();
     });
 
+    // Renderiza Nuvens Volumétricas de Fogo/Fumaça em Camadas
+    this.plumes.forEach(pl => {
+      const t = Math.max(0, pl.life / pl.maxLife);
+      const r = pl.startR + (pl.endR - pl.startR) * (1 - t);
+      ctx.save();
+      ctx.globalAlpha = Math.min(0.88, t * 1.15);
+      ctx.fillStyle = pl.color;
+      ctx.beginPath();
+      ctx.arc(pl.x - cameraX, pl.y, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = pl.innerColor;
+      ctx.beginPath();
+      ctx.arc(pl.x - cameraX - r * 0.16, pl.y - r * 0.16, r * 0.52, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    });
+
     // Renderiza Flashes Centrais de Explosão
     this.flashes.forEach(f => {
       const t = Math.max(0, f.life / f.maxLife);
@@ -313,6 +465,25 @@ export class ParticleSystem {
       ctx.fill();
       ctx.strokeStyle = '#ff6d00';
       ctx.lineWidth = 3;
+      ctx.stroke();
+      ctx.restore();
+    });
+
+    // Renderiza Anéis de Onda de Choque
+    this.shockwaves.forEach(sw => {
+      const t = Math.max(0, sw.life / sw.maxLife);
+      const r = Math.max(4, sw.maxRadius * (1 - t * 0.78));
+      ctx.save();
+      ctx.globalAlpha = t * 0.85;
+      ctx.strokeStyle = sw.color;
+      ctx.lineWidth = Math.max(1.5, 4.5 * t);
+      ctx.beginPath();
+      ctx.arc(sw.x - cameraX, sw.y, r, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = Math.max(1, 1.8 * t);
+      ctx.beginPath();
+      ctx.arc(sw.x - cameraX, sw.y, r * 0.82, 0, Math.PI * 2);
       ctx.stroke();
       ctx.restore();
     });
@@ -339,19 +510,31 @@ export class ParticleSystem {
       ctx.restore();
     });
 
-    // Renderiza Textos Flutuantes
+    // Renderiza Textos Flutuantes com Pop inicial
     this.damageTexts.forEach(t => {
-      const alpha = Math.max(0, t.life / t.maxLife);
+      const progress = Math.max(0, t.life / t.maxLife);
+      const pop = progress > 0.78 ? 1 + (1 - progress) * 1.4 : 1;
       ctx.save();
-      ctx.globalAlpha = alpha;
+      ctx.globalAlpha = Math.min(1, progress * 1.25);
+      ctx.translate(t.x - cameraX, t.y);
+      ctx.scale(pop, pop);
       ctx.fillStyle = '#000000';
       ctx.font = 'bold 12px monospace';
       ctx.textAlign = 'center';
-      // Sombra
-      ctx.fillText(t.text, t.x - cameraX + 1, t.y + 1);
+      ctx.fillText(t.text, 1, 1);
       ctx.fillStyle = t.color;
-      ctx.fillText(t.text, t.x - cameraX, t.y);
+      ctx.fillText(t.text, 0, 0);
       ctx.restore();
     });
+  }
+
+  renderScreenFlash(ctx, width, height) {
+    if (!this.screenFlash) return;
+    const t = Math.max(0, this.screenFlash.life / this.screenFlash.maxLife);
+    ctx.save();
+    ctx.globalAlpha = this.screenFlash.alpha * t;
+    ctx.fillStyle = this.screenFlash.color;
+    ctx.fillRect(0, 0, width, height);
+    ctx.restore();
   }
 }

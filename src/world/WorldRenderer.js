@@ -78,28 +78,76 @@ export class WorldRenderer {
 
   static renderCrates(ctx, renderer, crates, cameraX, width) {
     if (!crates) return;
-    const crateSprite = renderer && renderer.get('item_crate');
+    const now = Date.now();
+    const blinkFrame = Math.floor(now / 240) % 2 === 0 ? 1 : 2;
+    const intactCrate = renderer && ((renderer.ext && renderer.ext('crate_supply')) || renderer.get('item_crate'));
+    const dmgCrate = renderer && renderer.get('item_crate_dmg');
+
     for (const c of crates) {
       if (c.destroyed) continue;
       const sx = c.x - cameraX;
-      if (sx + c.width < -20 || sx > width + 20) continue;
+      if (sx + c.width < -30 || sx > width + 30) continue;
 
-      ctx.save();
-      if (crateSprite) {
-        ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(crateSprite, sx, c.y, c.width, c.height);
-      } else {
-        ctx.fillStyle = '#6d4c41';
-        ctx.fillRect(sx, c.y, c.width, c.height);
-        ctx.strokeStyle = '#3e2723';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(sx, c.y, c.width, c.height);
+      const shakeX = c.hitTimer > 0 ? Math.sin(c.hitTimer * 85) * 3.5 : 0;
+      const isDamaged = (c.maxHp || 1) > 1 && c.hp < (c.maxHp || 1);
+      const kind = c.kind || 'crate';
+
+      let sprite = intactCrate;
+      let drawW = 40;
+      let drawH = 40;
+      let labelColor = '#ffd54f';
+
+      if (kind === 'barrel') {
+        sprite = renderer && renderer.get(`item_barrel_${blinkFrame}`);
+        drawW = 36;
+        drawH = 38;
+        labelColor = '#ff5252';
+      } else if (kind === 'server') {
+        sprite = renderer && renderer.get(isDamaged ? 'item_server_dmg' : 'item_server_ok');
+        drawW = 38;
+        drawH = 44;
+        labelColor = '#00e5ff';
+      } else if (isDamaged && dmgCrate) {
+        sprite = dmgCrate;
       }
 
-      ctx.fillStyle = '#ffd54f';
-      ctx.font = 'bold 7px monospace';
+      const drawX = Math.round(sx + c.width / 2 - drawW / 2 + shakeX);
+      const drawY = Math.round(c.y + c.height - drawH);
+
+      ctx.save();
+      if (c.hitTimer > 0) {
+        ctx.filter = 'brightness(2.5) contrast(0.45)';
+      }
+      if (sprite) {
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(sprite, drawX, drawY, drawW, drawH);
+      } else {
+        ctx.fillStyle = kind === 'barrel' ? '#c62828' : kind === 'server' ? '#263238' : '#6d4c41';
+        ctx.fillRect(sx + shakeX, c.y, c.width, c.height);
+        ctx.strokeStyle = '#3e2723';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(sx + shakeX, c.y, c.width, c.height);
+      }
+      ctx.restore();
+
+      ctx.save();
+      if (isDamaged && (c.maxHp || 1) > 1) {
+        const barW = 28;
+        const barX = Math.round(sx + c.width / 2 - barW / 2);
+        const barY = drawY - 14;
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+        ctx.fillRect(barX - 1, barY - 1, barW + 2, 5);
+        ctx.fillStyle = '#ff9100';
+        ctx.fillRect(barX, barY, Math.round(barW * Math.max(0, c.hp / c.maxHp)), 3);
+      }
+
+      ctx.font = 'bold 8px "Press Start 2P", monospace';
       ctx.textAlign = 'center';
-      ctx.fillText(c.label || 'CODE', sx + c.width / 2, c.y - 4);
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = '#141013';
+      ctx.strokeText(c.label || 'CODE', sx + c.width / 2, drawY - 4);
+      ctx.fillStyle = labelColor;
+      ctx.fillText(c.label || 'CODE', sx + c.width / 2, drawY - 4);
       ctx.restore();
     }
   }
@@ -109,45 +157,59 @@ export class WorldRenderer {
     const now = Date.now();
     const t = now * 0.006;
     const runFrame = Math.floor(now / 95) % 4;
+    const cageSprite = renderer && renderer.ext && renderer.ext('pow_cage');
+
     for (const p of pows) {
       if (p.rescued && p.runTimer <= 0) continue;
       const sx = p.x - cameraX;
       if (sx < -80 || sx > width + 80) continue;
 
       const npcSheet = renderer && renderer.ext && renderer.ext(p.spriteKey || 'bg_npc_dev');
+      const centerX = Math.round(sx + p.width / 2);
+      const baseY = Math.round(p.y + p.height);
+
       ctx.save();
       ctx.imageSmoothingEnabled = false;
       if (!p.rescued) {
-        // Jaula/Corda "Tutorial Infinito" com sprite Hi-Bit real dentro
-        ctx.fillStyle = 'rgba(13, 18, 30, 0.72)';
-        ctx.fillRect(sx, p.y, p.width, p.height);
+        const cageW = 54;
+        const cageH = 70;
+        const cageX = Math.round(centerX - cageW / 2);
+        const cageY = baseY - cageH;
+
+        // Interior sombreado sutil atrás do personagem preso
+        ctx.fillStyle = 'rgba(10, 14, 24, 0.55)';
+        ctx.fillRect(cageX + 6, cageY + 12, cageW - 12, cageH - 18);
 
         if (npcSheet) {
           const fw = npcSheet.width / 4;
           const fh = npcSheet.height;
-          const drawH = p.height - 6;
+          const drawH = 52;
           const drawW = Math.round(fw * (drawH / fh));
-          ctx.drawImage(npcSheet, 0, 0, fw, fh, sx + (p.width - drawW) / 2, p.y + p.height - drawH - 2, drawW, drawH);
-        } else {
-          ctx.fillStyle = '#ffd6b8';
-          ctx.fillRect(sx + 11, p.y + 10, 12, 10);
-          ctx.fillStyle = '#00e5ff';
-          ctx.fillRect(sx + 10, p.y + 20, 14, 14);
+          const trappedFrame = Math.floor((now + p.x * 3) / 420) % 2 === 0 ? 1 : 3;
+          ctx.drawImage(
+            npcSheet,
+            trappedFrame * fw, 0, fw, fh,
+            Math.round(centerX - drawW / 2), baseY - 6 - drawH, drawW, drawH
+          );
         }
 
-        ctx.strokeStyle = '#ff9100';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(sx, p.y, p.width, p.height);
-        ctx.fillStyle = '#90a4ae';
-        for (let bx = sx + 6; bx < sx + p.width - 3; bx += 8) {
-          ctx.fillRect(bx, p.y + 2, 2, p.height - 4);
+        // Jaula de ferro Hi-Bit 16-bit com cadeado dourado
+        if (cageSprite) {
+          ctx.drawImage(cageSprite, cageX, cageY, cageW, cageH);
+        } else {
+          ctx.strokeStyle = '#607d8b';
+          ctx.lineWidth = 3;
+          ctx.strokeRect(cageX, cageY, cageW, cageH);
         }
 
         const bob = Math.sin(t) * 3;
-        ctx.fillStyle = '#ffea00';
-        ctx.font = 'bold 8px "Press Start 2P", monospace';
+        ctx.font = 'bold 9px "Press Start 2P", monospace';
         ctx.textAlign = 'center';
-        ctx.fillText('SOS', sx + p.width / 2, p.y - 6 + bob);
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#141013';
+        ctx.strokeText('SOS', centerX, cageY - 5 + bob);
+        ctx.fillStyle = '#ffea00';
+        ctx.fillText('SOS', centerX, cageY - 5 + bob);
       } else {
         // Dev libertado correndo em ciclo de 4 frames estilo POW do Metal Slug
         const alpha = Math.min(1, p.runTimer / 0.5);
@@ -155,19 +217,21 @@ export class WorldRenderer {
         if (npcSheet) {
           const fw = npcSheet.width / 4;
           const fh = npcSheet.height;
-          const drawH = p.height + 10;
+          const drawH = 58;
           const drawW = Math.round(fw * (drawH / fh));
-          ctx.drawImage(npcSheet, runFrame * fw, 0, fw, fh, sx + (p.width - drawW) / 2, p.y + p.height - drawH, drawW, drawH);
-        } else {
-          ctx.fillStyle = '#ffd6b8';
-          ctx.fillRect(sx + 11, p.y + 10, 12, 10);
-          ctx.fillStyle = '#00e676';
-          ctx.fillRect(sx + 10, p.y + 20, 14, 14);
+          ctx.drawImage(
+            npcSheet,
+            runFrame * fw, 0, fw, fh,
+            Math.round(centerX - drawW / 2), baseY - drawH, drawW, drawH
+          );
         }
-        ctx.fillStyle = '#00e676';
         ctx.font = 'bold 9px monospace';
         ctx.textAlign = 'center';
-        ctx.fillText(p.quip || 'THANK YOU!', sx + p.width / 2, p.y - 12);
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#141013';
+        ctx.strokeText(p.quip || 'THANK YOU!', centerX, baseY - 64);
+        ctx.fillStyle = '#00e676';
+        ctx.fillText(p.quip || 'THANK YOU!', centerX, baseY - 64);
       }
       ctx.restore();
     }
@@ -330,7 +394,7 @@ export class WorldRenderer {
       ctx.strokeStyle = '#00e5ff';
       ctx.strokeRect(fwX, bombY, 148, 20);
       ctx.fillStyle = '#00e5ff';
-      ctx.fillText(`[F] BURST x${player.frameworkAmmo}`, fwX + 8, bombY + 14);
+      ctx.fillText(`BURST x${player.frameworkAmmo}`, fwX + 8, bombY + 14);
     }
 
     // Contador de Combo em Tempo Real
