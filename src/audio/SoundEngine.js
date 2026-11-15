@@ -167,6 +167,55 @@ export class SoundEngine {
     this.playNoise(0.08, now, 0.1);
   }
 
+  playDeflect() {
+    this.ensureContext();
+    if (!this.ctx || this.isMuted) return;
+    const now = this.ctx.currentTime;
+    this.playTone(1380, 'triangle', 0.08, now, 0.28);
+    this.playTone(2180, 'square', 0.12, now + 0.02, 0.16);
+    this.playNoise(0.05, now, 0.14);
+  }
+
+  playIaidoSlash() {
+    this.ensureContext();
+    if (!this.ctx || this.isMuted) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(1400, now);
+    osc.frequency.exponentialRampToValueAtTime(95, now + 0.16);
+
+    gain.gain.setValueAtTime(0.26, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+
+    osc.connect(gain);
+    gain.connect(this.sfxGain);
+    osc.start(now);
+    osc.stop(now + 0.16);
+
+    this.playTone(1850, 'triangle', 0.07, now, 0.18);
+    this.playNoise(0.11, now, 0.18);
+  }
+
+  playChronos(active = true) {
+    this.ensureContext();
+    if (!this.ctx || this.isMuted) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(active ? 520 : 220, now);
+    osc.frequency.exponentialRampToValueAtTime(active ? 140 : 620, now + 0.18);
+    gain.gain.setValueAtTime(0.22, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+    osc.connect(gain);
+    gain.connect(this.sfxGain);
+    osc.start(now);
+    osc.stop(now + 0.18);
+  }
+
   playDash() {
     this.ensureContext();
     if (!this.ctx || this.isMuted) return;
@@ -296,7 +345,7 @@ export class SoundEngine {
     });
   }
 
-  // --- BACKGROUND MUSIC SYNTHESIZER ---
+  // --- BACKGROUND MUSIC SYNTHESIZER (Lookahead Scheduler) ---
   startBgm(trackName = 'stage') {
     this.ensureContext();
     if (!this.ctx) return;
@@ -306,18 +355,29 @@ export class SoundEngine {
     this.currentTrack = trackName;
     this.isPlayingBgm = true;
     this.step = 0;
+    this.nextNoteTime = this.ctx.currentTime + 0.04;
 
-    const tickMs = trackName === 'boss' ? 120 : 140;
+    const stepDuration = trackName === 'boss' ? 0.12 : 0.14;
+    const lookaheadSec = 0.12;
 
     this.bgmInterval = setInterval(() => {
-      if (!this.isPlayingBgm || this.isMuted || !this.ctx) return;
-      if (this.currentTrack === 'boss') {
-        this.stepBossTheme();
-      } else {
-        this.stepStageTheme();
+      if (!this.isPlayingBgm || !this.ctx) return;
+      // Evita acúmulo de notas se a aba ficou em background
+      if (this.nextNoteTime < this.ctx.currentTime - 0.3) {
+        this.nextNoteTime = this.ctx.currentTime + 0.02;
       }
-      this.step = (this.step + 1) % 32;
-    }, tickMs);
+      while (this.nextNoteTime < this.ctx.currentTime + lookaheadSec) {
+        if (!this.isMuted) {
+          if (this.currentTrack === 'boss') {
+            this.stepBossTheme(this.nextNoteTime);
+          } else {
+            this.stepStageTheme(this.nextNoteTime);
+          }
+        }
+        this.nextNoteTime += stepDuration;
+        this.step = (this.step + 1) % 32;
+      }
+    }, 25);
   }
 
   stopBgm() {
@@ -330,7 +390,7 @@ export class SoundEngine {
   }
 
   // Melodia alegre e heróica de aventura 16-bit
-  stepStageTheme() {
+  stepStageTheme(noteTime = this.ctx.currentTime) {
     const bassline = [
       130.81, 0, 130.81, 164.81, 196.00, 0, 196.00, 164.81, // C Major
       110.00, 0, 110.00, 130.81, 164.81, 0, 164.81, 130.81, // A Minor
@@ -347,24 +407,24 @@ export class SoundEngine {
 
     const bass = bassline[this.step];
     if (bass) {
-      this.playTone(bass, 'triangle', 0.14, this.ctx.currentTime, 0.22);
+      this.playTone(bass, 'triangle', 0.14, noteTime, 0.22);
     }
 
     const lead = leadMelody[this.step];
     if (lead) {
-      this.playTone(lead, 'square', 0.11, this.ctx.currentTime, 0.12);
+      this.playTone(lead, 'square', 0.11, noteTime, 0.12);
     }
 
     // Hi-hat / Snare
     if (this.step % 4 === 2) {
-      this.playNoise(0.06, this.ctx.currentTime, 0.08); // Snare
+      this.playNoise(0.06, noteTime, 0.08); // Snare
     } else if (this.step % 2 === 0) {
-      this.playNoise(0.02, this.ctx.currentTime, 0.03); // Closed Hat
+      this.playNoise(0.02, noteTime, 0.03); // Closed Hat
     }
   }
 
   // Tema tenso, rápido e ameaçador para o Boss ATS-9000
-  stepBossTheme() {
+  stepBossTheme(noteTime = this.ctx.currentTime) {
     const bassline = [
       73.42, 73.42, 87.31, 73.42, 98.00, 73.42, 87.31, 110.00, // D minor drive
       73.42, 73.42, 87.31, 73.42, 98.00, 73.42, 110.00, 130.81,
@@ -381,22 +441,22 @@ export class SoundEngine {
 
     const bass = bassline[this.step];
     if (bass) {
-      this.playTone(bass, 'sawtooth', 0.11, this.ctx.currentTime, 0.25);
+      this.playTone(bass, 'sawtooth', 0.11, noteTime, 0.25);
     }
 
     const lead = leadMelody[this.step];
     if (lead) {
-      this.playTone(lead, 'square', 0.09, this.ctx.currentTime, 0.16);
+      this.playTone(lead, 'square', 0.09, noteTime, 0.16);
     }
 
     // Heavy Industrial Drums
     if (this.step % 4 === 0) {
       // Kick
-      this.playTone(90, 'triangle', 0.08, this.ctx.currentTime, 0.35);
+      this.playTone(90, 'triangle', 0.08, noteTime, 0.35);
     }
     if (this.step % 4 === 2) {
       // Snare
-      this.playNoise(0.08, this.ctx.currentTime, 0.16);
+      this.playNoise(0.08, noteTime, 0.16);
     }
   }
 }

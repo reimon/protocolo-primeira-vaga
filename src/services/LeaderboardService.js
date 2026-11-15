@@ -111,8 +111,9 @@ export class LeaderboardService {
     return list;
   }
 
-  calculateFinalScore({ enemiesDefeated, timeSeconds, maxCombo, remainingHp, bossDefeated }) {
+  calculateFinalScore({ enemiesDefeated, devsRescued = 0, timeSeconds, maxCombo, remainingHp, bossDefeated }) {
     let score = enemiesDefeated * 200;
+    score += devsRescued * 500;
     score += maxCombo * 150;
     score += remainingHp * 25;
     // Bônus de tempo (quanto mais rápido, mais pontos)

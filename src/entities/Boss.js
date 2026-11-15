@@ -3,6 +3,8 @@
  * Boss.js - "ATS-9000: O Guardião Algorítmico do RH"
  */
 
+import { Enemy } from './Enemy.js';
+
 export class Boss {
   constructor(x, y) {
     this.x = x;
@@ -14,37 +16,55 @@ export class Boss {
     this.hp = 500;
     this.phase = 1; // 1 ou 2
     this.isDead = false;
+    this.deathFinished = false;
+    this.deathTimer = 0;
+    this.deathSinkY = 0;
     this.hitTimer = 0;
 
-    // Estados: 'idle', 'laser_barrage', 'ground_slam', 'recovering', 'mentor_event'
+    // Estados: 'idle', 'laser_barrage', 'ground_slam', 'email_storm', 'recovering', 'mentor_event'
     this.state = 'idle';
     this.stateTimer = 2.0;
     this.hoverTimer = 0;
 
-    // Intervenção do Mentor
+    // Intervenção do Mentor & Módulos Destrutíveis
     this.mentorEventTriggered = false;
     this.isCoreExposed = false;
+    this.moduleBroken = false;
 
     // Ataque
     this.attackCycle = 0;
     this.slamVy = 0;
     this.isSlamming = false;
     this.laserTimer = 0.45;
+    this.stormFired = false;
     this.deathExplosionCount = 0;
     this.deathExplosionTimer = 0;
   }
 
   update(dt, player, platforms, projectiles, enemies, soundEngine, particleSystem, screenShake, onMentorIntervention) {
     if (this.isDead) {
-      if (this.deathExplosionCount > 0 && particleSystem) {
+      if (!this.deathFinished) {
+        this.deathTimer -= dt;
+        this.deathSinkY += 18 * dt;
         this.deathExplosionTimer -= dt;
-        if (this.deathExplosionTimer <= 0) {
-          this.deathExplosionTimer = 0.2;
-          this.deathExplosionCount--;
+        if (this.deathExplosionTimer <= 0 && particleSystem) {
+          this.deathExplosionTimer = 0.22;
           particleSystem.createExplosion(
             this.x + Math.random() * this.width,
-            this.y + Math.random() * this.height
+            this.y + this.deathSinkY + Math.random() * this.height,
+            1.15
           );
+          if (screenShake) screenShake.trigger(9, 0.16);
+          if (soundEngine) soundEngine.playNoise(0.12, null, 0.25);
+        }
+        if (this.deathTimer <= 0) {
+          this.deathFinished = true;
+          if (particleSystem) {
+            particleSystem.createExplosion(this.x + this.width / 2, this.y + this.height / 2, 1.85);
+            particleSystem.createDamageNumber(this.x + this.width / 2, this.y - 16, 'ATS-9000 DESTRUÍDO!', '#ffd700');
+          }
+          if (screenShake) screenShake.trigger(22, 0.8);
+          if (soundEngine) soundEngine.playEnemyDeath();
         }
       }
       return;
@@ -52,6 +72,11 @@ export class Boss {
 
     if (this.hitTimer > 0) this.hitTimer -= dt;
     this.hoverTimer += dt * 2.5;
+
+    // Fumaça contínua quando o módulo de Filtro de Palavra-Chave é quebrado
+    if (this.moduleBroken && particleSystem && Math.random() < 0.22) {
+      particleSystem.createSmoke(this.x + 24, this.y + 32, 1, '#455a64');
+    }
 
     // Verifica transição para Fase 2 e intervenção do Mentor em 50% de HP
     if (this.hp <= this.maxHp * 0.5 && !this.mentorEventTriggered) {
@@ -127,6 +152,19 @@ export class Boss {
         }
         break;
 
+      case 'email_storm':
+        this.y = this.baseY + Math.sin(this.hoverTimer * 2) * 8;
+        if (!this.stormFired && this.stateTimer <= 1.25) {
+          this.stormFired = true;
+          this.fireEmailStorm(projectiles, enemies, soundEngine, particleSystem);
+        }
+        if (this.stateTimer <= 0) {
+          this.state = 'recovering';
+          this.stateTimer = 2.8;
+          this.isCoreExposed = true;
+        }
+        break;
+
       case 'recovering':
         // Núcleo sobrecarregado aberto para dano crítico!
         this.y = this.baseY;
@@ -181,7 +219,11 @@ export class Boss {
 
   chooseNextAttack(player) {
     this.attackCycle++;
-    if (this.phase === 2 && this.attackCycle % 2 === 0) {
+    if (this.phase === 2 && this.attackCycle % 3 === 0) {
+      this.state = 'email_storm';
+      this.stateTimer = 1.95;
+      this.stormFired = false;
+    } else if (this.phase === 2 && this.attackCycle % 2 === 0) {
       // Fase 2 faz Ground Slam com ondas de choque
       this.state = 'ground_slam';
       this.stateTimer = 2.2;
@@ -189,6 +231,35 @@ export class Boss {
     } else {
       this.state = 'laser_barrage';
       this.stateTimer = this.phase === 2 ? 3.0 : 3.8;
+    }
+  }
+
+  fireEmailStorm(projectiles, enemies, soundEngine, particleSystem) {
+    // Dispara leque de emails automáticos + invoca no máximo 1 drone de RH se não houver nenhum ativo
+    const angles = [-0.35, -0.15, 0.05, 0.25];
+    for (const ang of angles) {
+      projectiles.push({
+        type: 'ghosting',
+        x: this.x + 12,
+        y: this.y + 42,
+        vx: -Math.cos(ang) * 310,
+        vy: Math.sin(ang) * 230,
+        width: 18,
+        height: 18,
+        damage: 16,
+        isEnemy: true,
+        life: 3.5
+      });
+    }
+    if (enemies && enemies.filter(e => !e.isDead && e.type === 'drone').length === 0) {
+      const drone = new Enemy('drone', this.x - 40, this.baseY - 70);
+      drone.hp = 25;
+      drone.maxHp = 25;
+      enemies.push(drone);
+    }
+    if (soundEngine) soundEngine.playNoise(0.14, null, 0.2);
+    if (particleSystem) {
+      particleSystem.createSparks(this.x + 12, this.y + 42, '#00e5ff', 10);
     }
   }
 
@@ -259,6 +330,15 @@ export class Boss {
     soundEngine.playHit();
     screenShake.trigger(5, 0.15);
 
+    if (!this.moduleBroken && this.hp <= this.maxHp * 0.7 && this.hp > 0) {
+      this.moduleBroken = true;
+      if (particleSystem) {
+        particleSystem.createExplosion(this.x + 28, this.y + 38, 0.9);
+        particleSystem.createDamageNumber(this.x + 40, this.y - 26, 'FILTRO QUEBRADO!', '#ff9100');
+      }
+      screenShake.trigger(12, 0.35);
+    }
+
     if (particleSystem) {
       particleSystem.createSparks(this.x + 50, this.y + 60, '#ff1744', 8);
       particleSystem.createDamageNumber(this.x + 40, this.y - 10, Math.floor(finalDamage), '#ffffff');
@@ -267,10 +347,13 @@ export class Boss {
     if (this.hp <= 0) {
       this.hp = 0;
       this.isDead = true;
-      this.deathExplosionCount = 5;
+      this.deathFinished = false;
+      this.deathTimer = 1.9;
+      this.deathSinkY = 0;
+      this.deathExplosionCount = 6;
       this.deathExplosionTimer = 0;
       soundEngine.playEnemyDeath();
-      screenShake.trigger(20, 1.0);
+      screenShake.trigger(18, 0.8);
     }
 
     return finalDamage;
@@ -286,23 +369,24 @@ export class Boss {
   }
 
   render(ctx, renderer, cameraX) {
-    if (this.isDead) return;
+    if (this.isDead && this.deathFinished) return;
 
     let spriteKey = 'boss_ats_idle';
     if (this.hitTimer > 0) {
       spriteKey = 'boss_ats_attack';
-    } else if (this.state === 'laser_barrage') {
+    } else if (this.state === 'laser_barrage' || this.state === 'email_storm') {
       spriteKey = 'boss_ats_laser';
-    } else if (this.state === 'recovering') {
+    } else if (this.state === 'recovering' || this.isDead) {
       spriteKey = 'boss_ats_stunned';
     }
 
     const sprite = renderer.get(spriteKey) || renderer.get('boss_ats_idle');
-    const screenX = this.x - cameraX;
-    const screenY = this.y;
+    const dyingShake = this.isDead ? (Math.random() - 0.5) * 10 : 0;
+    const screenX = this.x - cameraX + dyingShake;
+    const screenY = this.y + (this.isDead ? this.deathSinkY : 0);
 
-    // Telegraph de Ground Slam (zona de perigo no chão + ícone !)
-    if (this.state === 'ground_slam' && !this.isSlamming) {
+    // Telegraph de Ground Slam ou Email Storm
+    if (!this.isDead && this.state === 'ground_slam' && !this.isSlamming) {
       const pulse = 0.5 + 0.5 * Math.sin(Date.now() * 0.02);
       ctx.save();
       ctx.fillStyle = `rgba(255, 23, 68, ${0.25 + 0.35 * pulse})`;
@@ -312,13 +396,20 @@ export class Boss {
       ctx.textAlign = 'center';
       ctx.fillText('!', screenX + this.width / 2, screenY - 12);
       ctx.restore();
+    } else if (!this.isDead && this.state === 'email_storm' && !this.stormFired) {
+      ctx.save();
+      ctx.fillStyle = '#00e5ff';
+      ctx.font = 'bold 11px "Press Start 2P", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('! SPAM AUTOMÁTICO !', screenX + this.width / 2, screenY - 16);
+      ctx.restore();
     }
 
     // Sombra projetada do Boss no calçadão
     ctx.save();
     ctx.fillStyle = 'rgba(12, 18, 28, 0.45)';
     ctx.beginPath();
-    ctx.ellipse(screenX + this.width / 2, screenY + this.height + 4, 48, 12, 0, 0, Math.PI * 2);
+    ctx.ellipse(screenX + this.width / 2, this.baseY + this.height + 4, 48, 12, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
 
@@ -328,20 +419,45 @@ export class Boss {
       const drawW = Math.round(png.width * (drawH / png.height));
       ctx.save();
       ctx.imageSmoothingEnabled = false;
-      if (this.hitTimer > 0) ctx.filter = 'brightness(2.2)';
+      if (this.isDead) {
+        ctx.globalAlpha = Math.max(0.25, this.deathTimer / 1.9);
+        if (Math.floor(Date.now() / 60) % 2 === 0) ctx.filter = 'brightness(2.8) contrast(0.4)';
+      } else if (this.hitTimer > 0.07) ctx.filter = 'brightness(3.2) contrast(0.3)';
       else if (this.isCoreExposed) { ctx.shadowColor = '#ffd600'; ctx.shadowBlur = 24; }
       ctx.drawImage(png, screenX + this.width / 2 - drawW / 2, screenY + this.height - drawH, drawW, drawH);
       ctx.restore();
     } else if (sprite) {
+      ctx.save();
+      if (this.isDead && Math.floor(Date.now() / 60) % 2 === 0) ctx.filter = 'brightness(2.8) contrast(0.4)';
+      else if (this.hitTimer > 0.07) ctx.filter = 'brightness(3.2) contrast(0.3)';
       ctx.drawImage(sprite, screenX, screenY);
+      ctx.restore();
     }
 
-    // Indicador visual de núcleo vulnerável
+    if (this.isDead) return;
+
+    // Indicador visual de núcleo vulnerável (alvo pulsante + texto)
     if (this.isCoreExposed) {
+      const pulseR = 22 + Math.sin(Date.now() * 0.015) * 4;
+      ctx.save();
+      ctx.strokeStyle = '#ffea00';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(screenX + this.width / 2, screenY + this.height * 0.55, pulseR, 0, Math.PI * 2);
+      ctx.stroke();
       ctx.fillStyle = '#ffea00';
       ctx.font = 'bold 10px monospace';
       ctx.textAlign = 'center';
       ctx.fillText('NÚCLEO EXPOSTO! ATAQUE!', screenX + this.width / 2, screenY - 14);
+      ctx.restore();
+    } else if (this.state === 'laser_barrage') {
+      ctx.save();
+      ctx.fillStyle = '#ff8a80';
+      ctx.font = 'bold 10px monospace';
+      ctx.textAlign = 'center';
+      const bossQuip = this.phase === 2 ? '"Faltam 10 anos de React!"' : '"PDF sem palavra-chave!"';
+      ctx.fillText(bossQuip, screenX + this.width / 2, screenY - 14);
+      ctx.restore();
     }
   }
 

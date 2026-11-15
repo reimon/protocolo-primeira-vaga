@@ -86,13 +86,19 @@ export class PixelRenderer {
     const list = [
       { key: 'intro_career', path: 'assets/sprites/intro_career_loading.png' },
       { key: 'hero', path: 'assets/sprites/hero_frames.png' },
+      { key: 'hero_actions', path: 'assets/sprites/hero_actions_frames.png' },
       { key: 'hero_female', path: 'assets/sprites/hero_female_frames.png' },
+      { key: 'hero_female_actions', path: 'assets/sprites/hero_female_actions_frames.png' },
       { key: 'mentor', path: 'assets/sprites/mentor_sprite.png' },
       { key: 'mentor_portrait', path: 'assets/sprites/mentor_portrait.png' },
       { key: 'boss', path: 'assets/sprites/boss_ats_trim.png' },
       { key: 'bg_buildings', path: 'assets/sprites/bg_buildings.png' },
       { key: 'bg_buildings_2', path: 'assets/sprites/bg_buildings_2.png' },
-      { key: 'fg_promenade', path: 'assets/sprites/fg_promenade_strip.png' }
+      { key: 'fg_promenade', path: 'assets/sprites/fg_promenade_strip.png' },
+      { key: 'bg_npc_dev', path: 'assets/sprites/bg_npc_dev_frames.png' },
+      { key: 'bg_npc_woman', path: 'assets/sprites/bg_npc_woman_frames.png' },
+      { key: 'bg_npc_commuter', path: 'assets/sprites/bg_npc_commuter_frames.png' },
+      { key: 'bg_npc_exec', path: 'assets/sprites/bg_npc_exec_frames.png' }
     ];
 
     await Promise.all(list.map(item => new Promise((resolve) => {
@@ -498,145 +504,234 @@ export class PixelRenderer {
   }
 
   // =========================================================================
-  // 3. INIMIGOS E CHEFE ATS-9000 HI-BIT
+  // 3. INIMIGOS E CHEFE ATS-9000 HI-BIT (4+ FRAMES POR CICLO)
   // =========================================================================
   generateHiBitEnemies() {
     const P = this.palette;
 
-    // 1. Bug Rastejante (32x32)
-    ['walk1', 'walk2', 'hit'].forEach(s => {
+    // 1. Bug Rastejante (36x36) - 4 frames de marcha + lunge + hit
+    ['walk1', 'walk2', 'walk3', 'walk4', 'lunge', 'hit'].forEach((s, idx) => {
       const { canvas, ctx } = this.createCanvas(36, 36);
       const isHit = s === 'hit';
-      const legOff = s === 'walk1' ? 2 : -2;
+      const isLunge = s === 'lunge';
+      const phase = idx % 4;
+      const bodyBob = isLunge ? 2 : (phase === 1 || phase === 3 ? -1 : 0);
+      const legWave = [2, 0, -2, 0][phase];
+      const legWave2 = [-2, 0, 2, 0][phase];
+
+      // Antenas articuladas
+      ctx.fillStyle = P.outline;
+      ctx.fillRect(6, 6 + bodyBob + (phase % 2), 2, 5);
+      ctx.fillRect(10, 5 + bodyBob + ((phase + 1) % 2), 2, 6);
+      ctx.fillStyle = isLunge ? '#ffea00' : P.bugLaser;
+      ctx.fillRect(5, 5 + bodyBob + (phase % 2), 3, 2);
+      ctx.fillRect(9, 4 + bodyBob + ((phase + 1) % 2), 3, 2);
 
       // Contorno Preto
       ctx.fillStyle = P.outline;
-      ctx.fillRect(6, 10, 24, 16);
+      ctx.fillRect(6, 10 + bodyBob, 24, 16);
 
-      // Carapaça Verde Metálica com Luz Especular
-      ctx.fillStyle = isHit ? '#ffffff' : P.bugBase;
-      ctx.fillRect(7, 11, 22, 14);
-      ctx.fillStyle = isHit ? '#ffffff' : P.bugLight;
-      ctx.fillRect(8, 12, 18, 4);
+      // Carapaça Verde Metálica com 4 tons
+      ctx.fillStyle = isHit ? '#ffffff' : (isLunge ? '#c62828' : P.bugDark);
+      ctx.fillRect(7, 11 + bodyBob, 22, 14);
+      ctx.fillStyle = isHit ? '#ffffff' : (isLunge ? '#ff5252' : P.bugBase);
+      ctx.fillRect(7, 11 + bodyBob, 21, 11);
+      ctx.fillStyle = isHit ? '#ffffff' : (isLunge ? '#ff8a80' : P.bugLight);
+      ctx.fillRect(8, 12 + bodyBob, 18, 4);
       ctx.fillStyle = '#ffffff';
-      ctx.fillRect(10, 13, 8, 2); // Brilho especular
+      ctx.fillRect(10 + (phase % 2), 13 + bodyBob, 7, 2);
 
-      // Scanner Laser / Olho Vermelho
-      ctx.fillStyle = P.bugLaser;
-      ctx.fillRect(4, 14, 5, 5);
+      // Segmentos da carapaça
+      if (!isHit) {
+        ctx.fillStyle = P.outlineSoft;
+        ctx.fillRect(15, 12 + bodyBob, 2, 12);
+        ctx.fillRect(22, 12 + bodyBob, 2, 12);
+      }
+
+      // Scanner Laser / Mandíbulas
+      ctx.fillStyle = isLunge ? '#ffea00' : P.bugLaser;
+      ctx.fillRect(3, 14 + bodyBob, 6, 5);
       ctx.fillStyle = '#ffffff';
-      ctx.fillRect(5, 15, 2, 2);
+      ctx.fillRect(4, 15 + bodyBob, 2, 2);
 
-      // Patas Articuladas Mecânicas
+      // 3 pares de patas articuladas em onda
       ctx.fillStyle = '#1c2833';
-      ctx.fillRect(7 + legOff, 24, 4, 7);
-      ctx.fillRect(16, 24 - legOff, 4, 7);
-      ctx.fillRect(25 - legOff, 24, 4, 7);
+      ctx.fillRect(7 + legWave, 24 + bodyBob, 4, 7);
+      ctx.fillRect(16 + legWave2, 24 + bodyBob, 4, 7);
+      ctx.fillRect(25 + legWave, 24 + bodyBob, 4, 7);
+      ctx.fillStyle = P.bugLight;
+      ctx.fillRect(8 + legWave, 25 + bodyBob, 2, 3);
+      ctx.fillRect(17 + legWave2, 25 + bodyBob, 2, 3);
+      ctx.fillRect(26 + legWave, 25 + bodyBob, 2, 3);
 
       this.set(`enemy_bug_${s}`, canvas);
     });
 
-    // 2. Fantasma da Síndrome do Impostor (36x36)
-    ['float1', 'float2', 'hit'].forEach(s => {
+    // 2. Fantasma da Síndrome do Impostor (36x36) - 4 frames de flutuação + hit
+    ['float1', 'float2', 'float3', 'float4', 'hit'].forEach((s, idx) => {
       const { canvas, ctx } = this.createCanvas(36, 36);
       const isHit = s === 'hit';
-      const bob = s === 'float1' ? 0 : 2;
+      const phase = idx % 4;
+      const bob = [0, 1, 2, 1][phase];
+      const t1 = [0, 2, 0, -2][phase];
+      const t2 = [-2, 0, 2, 0][phase];
 
-      // Ectoplasma com Dithering e Luz Ciano
-      ctx.fillStyle = isHit ? '#ffffff' : P.ghostBase;
+      // Ectoplasma ondulante com contorno suave
+      ctx.fillStyle = isHit ? '#ffffff' : P.ghostDark;
       ctx.beginPath();
-      ctx.arc(18, 14 + bob, 12, Math.PI, 0);
-      ctx.lineTo(30, 28 + bob);
+      ctx.arc(18, 14 + bob, 13, Math.PI, 0);
+      ctx.lineTo(31, 29 + bob + t1);
       ctx.lineTo(24, 24 + bob);
-      ctx.lineTo(18, 28 + bob);
+      ctx.lineTo(18, 30 + bob + t2);
       ctx.lineTo(12, 24 + bob);
-      ctx.lineTo(6, 28 + bob);
+      ctx.lineTo(5, 29 + bob + t1);
       ctx.closePath();
       ctx.fill();
 
-      // Olhos Ocos com Brilho Ciano
+      ctx.fillStyle = isHit ? '#ffffff' : P.ghostBase;
+      ctx.beginPath();
+      ctx.arc(18, 14 + bob, 11, Math.PI, 0);
+      ctx.lineTo(29, 27 + bob + t1);
+      ctx.lineTo(24, 23 + bob);
+      ctx.lineTo(18, 28 + bob + t2);
+      ctx.lineTo(12, 23 + bob);
+      ctx.lineTo(7, 27 + bob + t1);
+      ctx.closePath();
+      ctx.fill();
+
+      // Luz de destaque no topo
+      if (!isHit) {
+        ctx.fillStyle = P.ghostLight;
+        ctx.fillRect(12, 5 + bob, 8, 3);
+      }
+
+      // Olhos Ocos com Brilho Ciano pulsante
       ctx.fillStyle = P.ghostCyan;
       ctx.fillRect(11, 12 + bob, 4, 5);
       ctx.fillRect(21, 12 + bob, 4, 5);
       ctx.fillStyle = '#ffffff';
-      ctx.fillRect(12, 13 + bob, 2, 2);
-      ctx.fillRect(22, 13 + bob, 2, 2);
+      ctx.fillRect(12 + (phase % 2), 13 + bob, 2, 2);
+      ctx.fillRect(22 + (phase % 2), 13 + bob, 2, 2);
+
+      // Partícula ectoplásmica lateral
+      if (!isHit) {
+        ctx.fillStyle = P.ghostCyan;
+        ctx.fillRect(3 + phase, 20 - phase, 2, 2);
+        ctx.fillRect(31 - phase, 16 + phase, 2, 2);
+      }
 
       this.set(`enemy_ghost_${s}`, canvas);
     });
 
-    // 3. Golem do "Pede-se 5 Anos de Experiência" (54x54)
-    ['stand', 'walk', 'hit'].forEach(s => {
+    // 3. Golem do "Pede-se 5 Anos de Experiência" (56x56) - stand, 4 walk, 4 noshield, hit
+    const golemStates = ['stand', 'walk1', 'walk2', 'walk3', 'walk4', 'noshield1', 'noshield2', 'noshield3', 'noshield4', 'hit'];
+    golemStates.forEach((s, idx) => {
       const { canvas, ctx } = this.createCanvas(56, 56);
       const isHit = s === 'hit';
-      const bob = s === 'walk' ? 2 : 0;
+      const hasShield = !s.startsWith('noshield');
+      const phase = s === 'stand' || isHit ? 0 : (idx - 1) % 4;
+      const bob = [0, 1, 2, 1][phase];
+      const legL = [0, -2, 0, 2][phase];
+      const legR = [0, 2, 0, -2][phase];
+
+      // Pernas / Botas de pedra articuladas
+      ctx.fillStyle = P.outline;
+      ctx.fillRect(10, 42 + legL, 10, 10);
+      ctx.fillRect(24, 42 + legR, 10, 10);
+      ctx.fillStyle = isHit ? '#ffffff' : P.golemDark;
+      ctx.fillRect(11, 43 + legL, 8, 8);
+      ctx.fillRect(25, 43 + legR, 8, 8);
 
       // Corpo Maciço de Pedra com Contorno
       ctx.fillStyle = P.outline;
-      ctx.fillRect(8, 8 + bob, 28, 38);
+      ctx.fillRect(8, 8 + bob, 28, 36);
       ctx.fillStyle = isHit ? '#ffffff' : P.golemBase;
-      ctx.fillRect(9, 9 + bob, 26, 36);
-      ctx.fillStyle = P.golemLight;
-      ctx.fillRect(10, 10 + bob, 10, 32);
+      ctx.fillRect(9, 9 + bob, 26, 34);
+      ctx.fillStyle = isHit ? '#ffffff' : P.golemLight;
+      ctx.fillRect(10, 10 + bob, 10, 30);
+
+      // Núcleo rúnico rachado (visível principalmente quando sem escudo)
+      if (!hasShield && !isHit) {
+        ctx.fillStyle = '#ff6d00';
+        ctx.fillRect(18, 22 + bob, 10, 10);
+        ctx.fillStyle = '#ffea00';
+        ctx.fillRect(20, 24 + bob, 6, 6);
+      }
 
       // Visor Vermelho Feroz
       ctx.fillStyle = '#ff1744';
       ctx.fillRect(14, 14 + bob, 14, 4);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(15 + (phase % 2), 15 + bob, 3, 2);
 
-      // O ENORME ESCUDO FRONTAL DOURADO "5+ YRS"
-      const shX = 32;
-      const shY = 4 + bob;
-      ctx.fillStyle = P.outline;
-      ctx.fillRect(shX, shY, 18, 44);
-      ctx.fillStyle = '#f39c12';
-      ctx.fillRect(shX + 1, shY + 1, 16, 42);
-      ctx.fillStyle = '#f1c40f';
-      ctx.fillRect(shX + 2, shY + 2, 12, 40);
+      if (hasShield) {
+        // O ENORME ESCUDO FRONTAL DOURADO "5+ YRS"
+        const shX = 32;
+        const shY = 4 + bob;
+        ctx.fillStyle = P.outline;
+        ctx.fillRect(shX, shY, 18, 44);
+        ctx.fillStyle = '#f39c12';
+        ctx.fillRect(shX + 1, shY + 1, 16, 42);
+        ctx.fillStyle = '#f1c40f';
+        ctx.fillRect(shX + 2, shY + 2, 12, 40);
 
-      // Rebites de Aço no Escudo
-      ctx.fillStyle = '#37474f';
-      ctx.fillRect(shX + 3, shY + 3, 3, 3);
-      ctx.fillRect(shX + 12, shY + 3, 3, 3);
-      ctx.fillRect(shX + 3, shY + 38, 3, 3);
-      ctx.fillRect(shX + 12, shY + 38, 3, 3);
+        ctx.fillStyle = '#37474f';
+        ctx.fillRect(shX + 3, shY + 3, 3, 3);
+        ctx.fillRect(shX + 12, shY + 3, 3, 3);
+        ctx.fillRect(shX + 3, shY + 38, 3, 3);
+        ctx.fillRect(shX + 12, shY + 38, 3, 3);
 
-      // Inscrição "5+" em Pixel Art
-      ctx.fillStyle = '#000000';
-      ctx.fillRect(shX + 5, shY + 14, 6, 2);
-      ctx.fillRect(shX + 5, shY + 16, 2, 4);
-      ctx.fillRect(shX + 5, shY + 20, 6, 2);
-      ctx.fillRect(shX + 9, shY + 22, 2, 4);
-      ctx.fillRect(shX + 5, shY + 26, 6, 2);
-      // Símbolo +
-      ctx.fillRect(shX + 6, shY + 32, 4, 2);
-      ctx.fillRect(shX + 7, shY + 30, 2, 6);
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(shX + 5, shY + 14, 6, 2);
+        ctx.fillRect(shX + 5, shY + 16, 2, 4);
+        ctx.fillRect(shX + 5, shY + 20, 6, 2);
+        ctx.fillRect(shX + 9, shY + 22, 2, 4);
+        ctx.fillRect(shX + 5, shY + 26, 6, 2);
+        ctx.fillRect(shX + 6, shY + 32, 4, 2);
+        ctx.fillRect(shX + 7, shY + 30, 2, 6);
+      }
 
+      if (s === 'walk1') this.set('enemy_golem_walk', canvas);
       this.set(`enemy_golem_${s}`, canvas);
     });
 
-    // 4. Drone de Ghosting (36x36)
-    ['fly1', 'fly2', 'hit'].forEach(s => {
+    // 4. Drone de Ghosting (36x36) - 4 frames de rotor + charge + hit
+    ['fly1', 'fly2', 'fly3', 'fly4', 'charge', 'hit'].forEach((s, idx) => {
       const { canvas, ctx } = this.createCanvas(36, 36);
       const isHit = s === 'hit';
-      const propCycle = s === 'fly1';
+      const isCharge = s === 'charge';
+      const phase = idx % 4;
+      const rotorW = [28, 16, 8, 18][phase];
+      const rotorX = 18 - Math.floor(rotorW / 2);
+      const bob = [0, 1, 0, -1][phase];
 
-      // Hélices com Blur
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-      ctx.fillRect(propCycle ? 4 : 6, 4, 24, 2);
+      // Hélices com 4 fases de rotação
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+      ctx.fillRect(rotorX, 4 + bob, rotorW, 2);
+      ctx.fillStyle = '#90a4ae';
+      ctx.fillRect(16, 6 + bob, 4, 3);
 
       // Chassi do Drone
       ctx.fillStyle = P.outline;
-      ctx.fillRect(8, 8, 20, 18);
+      ctx.fillRect(8, 8 + bob, 20, 18);
       ctx.fillStyle = isHit ? '#ffffff' : '#37474f';
-      ctx.fillRect(9, 9, 18, 16);
+      ctx.fillRect(9, 9 + bob, 18, 16);
+      ctx.fillStyle = isHit ? '#ffffff' : '#546e7a';
+      ctx.fillRect(10, 10 + bob, 16, 3);
 
       // Tela com Ícone de E-mail Sem Resposta
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(11, 11, 14, 10);
-      ctx.fillStyle = '#ff1744';
-      ctx.fillRect(13, 12, 3, 3);
-      ctx.fillRect(19, 12, 3, 3);
-      ctx.fillRect(16, 15, 3, 3);
+      ctx.fillStyle = isCharge ? '#ffebee' : '#ffffff';
+      ctx.fillRect(11, 12 + bob, 14, 10);
+      ctx.fillStyle = isCharge ? '#ff1744' : '#e53935';
+      ctx.fillRect(13, 13 + bob, 3, 3);
+      ctx.fillRect(19, 13 + bob, 3, 3);
+      ctx.fillRect(16, 16 + bob, 3, 3);
+
+      // Canhão inferior brilhando quando carregando tiro
+      ctx.fillStyle = P.outline;
+      ctx.fillRect(15, 26 + bob, 6, 5);
+      ctx.fillStyle = isCharge ? '#ffea00' : '#00e5ff';
+      ctx.fillRect(16, 27 + bob, 4, 3);
 
       this.set(`enemy_drone_${s}`, canvas);
     });
@@ -854,6 +949,59 @@ export class PixelRenderer {
     oCtx.arc(18, 18, 4, 0, Math.PI * 2);
     oCtx.fill();
     this.set('item_offer', offer);
+
+    // 4. Caixa Destrutível Hi-Bit estilo Metal Slug (34x34)
+    const { canvas: crate, ctx: crCtx } = this.createCanvas(34, 34);
+    crCtx.fillStyle = this.palette.outline;
+    crCtx.fillRect(0, 0, 34, 34);
+    crCtx.fillStyle = '#5d4037';
+    crCtx.fillRect(2, 2, 30, 30);
+    crCtx.fillStyle = '#795548';
+    crCtx.fillRect(3, 3, 28, 7);
+    crCtx.fillRect(3, 12, 28, 8);
+    crCtx.fillRect(3, 22, 28, 8);
+    crCtx.fillStyle = '#a1887f';
+    crCtx.fillRect(4, 3, 24, 2);
+    crCtx.fillRect(4, 12, 24, 2);
+    // Moldura de aço e rebites
+    crCtx.fillStyle = '#37474f';
+    crCtx.fillRect(2, 2, 30, 3);
+    crCtx.fillRect(2, 29, 30, 3);
+    crCtx.fillRect(2, 2, 3, 30);
+    crCtx.fillRect(29, 2, 3, 30);
+    crCtx.fillStyle = '#ffd54f';
+    crCtx.fillRect(3, 3, 2, 2);
+    crCtx.fillRect(29, 3, 2, 2);
+    crCtx.fillRect(3, 29, 2, 2);
+    crCtx.fillRect(29, 29, 2, 2);
+    this.set('item_crate', crate);
+
+    // 5. Pickups por Letra estilo Metal Slug ([F] e [G], 2 frames com brilho)
+    [
+      { key: 'pickup_f', letter: 'F', border: '#00e5ff', bg: '#0d1b2a', text: '#80deea' },
+      { key: 'pickup_g', letter: 'G', border: '#ff9100', bg: '#261409', text: '#ffd180' }
+    ].forEach(({ key, letter, border, bg, text }) => {
+      [1, 2].forEach((frame) => {
+        const { canvas: pk, ctx: pkCtx } = this.createCanvas(24, 24);
+        pkCtx.fillStyle = this.palette.outline;
+        pkCtx.fillRect(0, 0, 24, 24);
+        pkCtx.fillStyle = border;
+        pkCtx.fillRect(2, 2, 20, 20);
+        pkCtx.fillStyle = bg;
+        pkCtx.fillRect(4, 4, 16, 16);
+        // Reflexo animado no frame 2
+        if (frame === 2) {
+          pkCtx.fillStyle = '#ffffff';
+          pkCtx.fillRect(3, 3, 5, 2);
+          pkCtx.fillRect(17, 19, 4, 2);
+        }
+        pkCtx.fillStyle = text;
+        pkCtx.font = 'bold 12px monospace';
+        pkCtx.textAlign = 'center';
+        pkCtx.fillText(letter, 12, 16);
+        this.set(`item_${key}_${frame}`, pk);
+      });
+    });
   }
 
   generateHiBitProjectiles() {
@@ -887,5 +1035,22 @@ export class PixelRenderer {
     sCtx.fillStyle = '#ffffff';
     sCtx.fillRect(14, 6, 4, 10);
     this.set('proj_shockwave', shock);
+
+    // 4. Git Bomb Hi-Bit (16x16, 2 frames de pavio)
+    [1, 2].forEach((frame) => {
+      const { canvas: bomb, ctx: bCtx } = this.createCanvas(16, 16);
+      bCtx.fillStyle = this.palette.outline;
+      bCtx.fillRect(3, 4, 10, 10);
+      bCtx.fillStyle = '#37474f';
+      bCtx.fillRect(4, 5, 8, 8);
+      bCtx.fillStyle = '#78909c';
+      bCtx.fillRect(5, 6, 3, 4);
+      // Faixa laranja e pavio aceso
+      bCtx.fillStyle = '#ff6d00';
+      bCtx.fillRect(4, 9, 8, 2);
+      bCtx.fillStyle = frame === 1 ? '#ffea00' : '#ff1744';
+      bCtx.fillRect(7, 1, 3, 3);
+      this.set(`proj_git_bomb_${frame}`, bomb);
+    });
   }
 }

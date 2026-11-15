@@ -13,6 +13,7 @@ import { ParallaxBackground } from '../world/ParallaxBackground.js';
 import { LoadingScene } from '../world/LoadingScene.js';
 import { LeaderboardService } from '../services/LeaderboardService.js';
 import { buildLevel1 } from '../world/Level1.js';
+import { ParticleSystem } from '../world/ParticleSystem.js';
 
 export class SelfTest {
   static runAll() {
@@ -141,6 +142,110 @@ export class SelfTest {
       wavePlayer.triggerAttack(sound);
       wavePlayer.triggerAttack(sound);
       assert('3º golpe no Nível 2 gera projétil Onda de Código', wavePlayer.pendingProjectile && wavePlayer.pendingProjectile.type === 'code_wave');
+
+      // 11. Teste de Game Feel (Bloco 1: Dash Cancel, Pogo Attack e Input Buffer)
+      const gfPlayer = new Player(100, 200);
+      gfPlayer.triggerAttack(sound);
+      assert('Player inicia ataque antes do Dash Cancel', gfPlayer.isAttacking === true);
+      gfPlayer.update(0.016, { left: false, right: false, down: false, jump: false, jumpPressed: false, dashPressed: true, attackPressed: false }, fakePlatform, sound, null);
+      assert('Dash Cancel interrompe ataque imediatamente', gfPlayer.isDashing === true && gfPlayer.isAttacking === false);
+
+      const pogoPlayer = new Player(100, 150);
+      pogoPlayer.onGround = false;
+      pogoPlayer.vy = 150;
+      pogoPlayer.update(0.016, { left: false, right: false, down: true, jump: false, jumpPressed: false, dashPressed: false, attackPressed: true }, [], sound, null);
+      assert('Pogo Attack cria hitbox para baixo no ar', pogoPlayer.attackHitbox && pogoPlayer.attackHitbox.isPogo === true);
+      pogoPlayer.bounceFromPogo(sound, null);
+      assert('Pogo bounce impulsiona o Player para cima', pogoPlayer.vy < 0);
+
+      const bufPlayer = new Player(100, 200);
+      bufPlayer.attackBufferTimer = 0.08;
+      bufPlayer.update(0.016, { left: false, right: false, down: false, jump: false, jumpPressed: false, dashPressed: false, attackPressed: false }, fakePlatform, sound, null);
+      assert('Input Buffer dispara ataque automaticamente quando válido', bufPlayer.isAttacking === true);
+
+      // 12. Testes estilo Katana Zero (Up-Slash, Dash-Slash, Iaido Blitz, Chronos) e Pedestres de Fundo
+      const upPlayer = new Player(100, 150);
+      upPlayer.onGround = false;
+      upPlayer.update(0.016, { left: false, right: false, up: true, down: false, jump: false, jumpPressed: false, dashPressed: false, attackPressed: true }, [], sound, null);
+      assert('Up-Slash cria hitbox acima do Player', upPlayer.attackType === 'upslash' && upPlayer.attackHitbox && upPlayer.attackHitbox.y < upPlayer.y);
+
+      const dsPlayer = new Player(100, 200);
+      dsPlayer.update(0.016, { left: false, right: false, up: false, down: false, jump: false, jumpPressed: false, dashPressed: true, attackPressed: false }, fakePlatform, sound, null);
+      dsPlayer.update(0.016, { left: false, right: false, up: false, down: false, jump: false, jumpPressed: false, dashPressed: false, attackPressed: true }, fakePlatform, sound, null);
+      assert('Dash-Slash executa corte horizontal veloz durante o Dash', dsPlayer.attackType === 'dash_slash' && dsPlayer.attackHitbox && dsPlayer.attackHitbox.width >= 70);
+
+      const iaidoPlayer = new Player(100, 200);
+      iaidoPlayer.update(0.016, { left: false, right: false, up: false, down: false, jump: false, jumpPressed: false, dashPressed: false, iaidoPressed: true, attackPressed: false }, fakePlatform, sound, null);
+      assert('Iaido Blitz ativa investida invencível com corte longo', iaidoPlayer.isIaido === true && iaidoPlayer.attackType === 'iaido_blitz' && iaidoPlayer.invincibleTimer > 0);
+
+      iaidoPlayer.update(0.016, { left: false, right: false, up: false, down: false, jump: false, jumpPressed: false, dashPressed: false, chronosPressed: true, attackPressed: false }, fakePlatform, sound, null);
+      assert('Chronos ativa foco temporal', iaidoPlayer.chronosActive === true);
+
+      const parallax = new ParallaxBackground(renderer, 1280, 720);
+      assert('ParallaxBackground possui pedestres Hi-Bit na calçada de fundo', Array.isArray(parallax.bgPedestrians) && parallax.bgPedestrians.length >= 6);
+
+      // 13. Testes Sprint Metal Slug 1-3 (Git Bomb, Framework Burst, Shatter Shield, Boss Clímax, Crates/POWs, Explosões)
+      const msPlayer = new Player(100, 200);
+      assert('Player inicia com 2 Git Bombs', msPlayer.bombAmmo === 2);
+      msPlayer.update(0.016, { left: false, right: false, up: false, down: false, jump: false, jumpPressed: false, dashPressed: false, bombPressed: true, attackPressed: false }, fakePlatform, sound, null);
+      assert('Git Bomb cria projétil parabólico e consome munição', msPlayer.pendingGrenade && msPlayer.pendingGrenade.type === 'git_bomb' && msPlayer.bombAmmo === 1);
+
+      msPlayer.frameworkAmmo = 3;
+      msPlayer.triggerAttack(sound);
+      assert('[F] Framework Burst dispara Onda de Código mesmo no 1º golpe', msPlayer.pendingProjectile && msPlayer.pendingProjectile.type === 'code_wave' && msPlayer.frameworkAmmo === 2);
+
+      const shieldGolem = new Enemy('golem', 300, 300);
+      assert('Golem.shatterShield quebra o escudo frontal', shieldGolem.shatterShield(null, sound) === true && shieldGolem.hasFrontShield === false);
+      assert('Após quebrar escudo, ataque frontal causa dano no Golem', shieldGolem.takeDamage(20, 1, null, sound) > 0);
+
+      const msBoss = new Boss(800, 300);
+      msBoss.takeDamage(160, false, null, sound, { trigger: () => {} });
+      assert('Boss quebra módulo de filtro ao cair abaixo de 70% HP', msBoss.moduleBroken === true);
+      msBoss.takeDamage(500, true, null, sound, { trigger: () => {} });
+      assert('Boss inicia morte cinematográfica antes de finalizar', msBoss.isDead === true && msBoss.deathFinished === false);
+      for (let t = 0; t < 12; t++) {
+        msBoss.update(0.2, msPlayer, [], [], [], sound, null, { trigger: () => {} }, () => {});
+      }
+      assert('Boss finaliza explosão em cadeia após deathTimer', msBoss.deathFinished === true);
+
+      assert('Level1 possui caixas destrutíveis, POWs e plataformas na arena do Boss',
+        Array.isArray(level.crates) && level.crates.length >= 4 &&
+        Array.isArray(level.pows) && level.pows.length >= 3 &&
+        level.platforms.some(p => p.x >= 4450 && p.y < 720 - 160)
+      );
+
+      const ps = new ParticleSystem();
+      ps.createExplosion(100, 100);
+      assert('Explosão Metal Slug gera flash central e estilhaços quicando', ps.flashes.length >= 1 && ps.debris.length >= 3);
+
+      const scoreWithPows = lb.calculateFinalScore({
+        enemiesDefeated: 5,
+        devsRescued: 2,
+        timeSeconds: 120,
+        maxCombo: 3,
+        remainingHp: 80,
+        bossDefeated: true
+      });
+      assert('Cálculo de Score adiciona +500 por Dev POW resgatado', scoreWithPows === score + 1000);
+
+      // 14. Testes de Densidade Frame-a-Frame & Agachar Funcional
+      const crouchPlayer = new Player(100, 258);
+      crouchPlayer.update(0.016, { left: false, right: false, up: false, down: false, jump: false, jumpPressed: false, dashPressed: false, attackPressed: false }, fakePlatform, sound, null);
+      crouchPlayer.update(0.016, { left: false, right: false, up: false, down: true, jump: false, jumpPressed: false, dashPressed: false, attackPressed: false }, fakePlatform, sound, null);
+      assert('Agachar no chão reduz hitbox e ativa estado crouch', crouchPlayer.isCrouching === true && crouchPlayer.height === 26 && crouchPlayer.state === 'crouch');
+      crouchPlayer.update(0.016, { left: false, right: false, up: false, down: false, jump: false, jumpPressed: false, dashPressed: false, attackPressed: false }, fakePlatform, sound, null);
+      assert('Levantar restaura altura padrão do Player', crouchPlayer.isCrouching === false && crouchPlayer.height === 42);
+
+      assert('Inimigos possuem ciclos de 4 frames e estados reativos Hi-Bit',
+        !!renderer.get('enemy_bug_walk4') && !!renderer.get('enemy_bug_lunge') &&
+        !!renderer.get('enemy_ghost_float4') &&
+        !!renderer.get('enemy_golem_walk4') && !!renderer.get('enemy_golem_noshield4') &&
+        !!renderer.get('enemy_drone_fly4') && !!renderer.get('enemy_drone_charge')
+      );
+      assert('Sprites Hi-Bit gerados para caixas, pickups [F]/[G] e Git Bomb',
+        !!renderer.get('item_crate') && !!renderer.get('item_pickup_f_2') &&
+        !!renderer.get('item_pickup_g_2') && !!renderer.get('proj_git_bomb_2')
+      );
 
     } catch (error) {
       console.error('Falha crítica nos testes:', error);

@@ -47,12 +47,17 @@ export class InputController {
 
       if (key === 'ArrowLeft' || key === 'KeyA') game.input.left = true;
       if (key === 'ArrowRight' || key === 'KeyD') game.input.right = true;
+      if (key === 'ArrowUp' || key === 'KeyW') game.input.up = true;
+      if (key === 'ArrowDown' || key === 'KeyS') game.input.down = true;
 
       if (key === 'Space' || key === 'ArrowUp' || key === 'KeyW' || key === 'KeyZ') {
         game.input.jump = true;
         game.input.jumpPressed = true;
       }
       if (key === 'KeyX' || key === 'KeyJ') game.input.attackPressed = true;
+      if (key === 'KeyF' || key === 'KeyL') game.input.iaidoPressed = true;
+      if (key === 'KeyG' || key === 'KeyB') game.input.bombPressed = true;
+      if (key === 'KeyQ') game.input.chronosPressed = true;
       if (key === 'KeyC' || key === 'KeyK' || key === 'ShiftLeft' || key === 'ShiftRight') {
         game.input.dashPressed = true;
       }
@@ -86,6 +91,8 @@ export class InputController {
       const key = e.code;
       if (key === 'ArrowLeft' || key === 'KeyA') game.input.left = false;
       if (key === 'ArrowRight' || key === 'KeyD') game.input.right = false;
+      if (key === 'ArrowUp' || key === 'KeyW') game.input.up = false;
+      if (key === 'ArrowDown' || key === 'KeyS') game.input.down = false;
       if (key === 'Space' || key === 'ArrowUp' || key === 'KeyW' || key === 'KeyZ') game.input.jump = false;
     };
 
@@ -246,20 +253,28 @@ export class InputController {
     if (!gp) return;
 
     if (!InputController._prevPad) {
-      InputController._prevPad = { jump: false, attack: false, dash: false, start: false };
+      InputController._prevPad = { jump: false, attack: false, dash: false, iaido: false, chronos: false, bomb: false, start: false };
     }
     const prev = InputController._prevPad;
 
     const axisX = gp.axes[0] || 0;
+    const axisY = gp.axes[1] || 0;
     const dpadLeft = gp.buttons[14]?.pressed;
     const dpadRight = gp.buttons[15]?.pressed;
+    const dpadUp = gp.buttons[12]?.pressed;
+    const dpadDown = gp.buttons[13]?.pressed;
 
     if (axisX < -0.35 || dpadLeft) game.input.left = true;
     else if (axisX > 0.35 || dpadRight) game.input.right = true;
+    game.input.up = axisY < -0.45 || !!dpadUp;
+    game.input.down = axisY > 0.45 || !!dpadDown;
 
     const jumpDown = !!gp.buttons[0]?.pressed;
     const attackDown = !!gp.buttons[2]?.pressed;
     const dashDown = !!(gp.buttons[1]?.pressed || gp.buttons[5]?.pressed);
+    const iaidoDown = !!gp.buttons[3]?.pressed;
+    const chronosDown = !!gp.buttons[4]?.pressed;
+    const bombDown = !!gp.buttons[7]?.pressed;
     const startDown = !!gp.buttons[9]?.pressed;
 
     if (jumpDown) game.input.jump = true;
@@ -269,6 +284,9 @@ export class InputController {
     }
     if (attackDown && !prev.attack) game.input.attackPressed = true;
     if (dashDown && !prev.dash) game.input.dashPressed = true;
+    if (iaidoDown && !prev.iaido) game.input.iaidoPressed = true;
+    if (chronosDown && !prev.chronos) game.input.chronosPressed = true;
+    if (bombDown && !prev.bomb) game.input.bombPressed = true;
     if (startDown && !prev.start) {
       if (game.state === 'PLAYING' || game.state === 'BOSS_FIGHT') game.openSettings();
       else if (game.state === 'SETTINGS') game.closeSettings();
@@ -277,6 +295,9 @@ export class InputController {
     prev.jump = jumpDown;
     prev.attack = attackDown;
     prev.dash = dashDown;
+    prev.iaido = iaidoDown;
+    prev.chronos = chronosDown;
+    prev.bomb = bombDown;
     prev.start = startDown;
   }
 }

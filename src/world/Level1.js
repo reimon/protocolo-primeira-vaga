@@ -15,6 +15,8 @@ export function buildLevel1(levelWidth, height) {
   const collectibles = [];
   const checkpoints = [];
   const hazards = [];
+  const crates = [];
+  const pows = [];
 
   // --- CHÃO CONTÍNUO & PAREDES ---
   platforms.push({ x: 0, y: groundY, width: levelWidth, height: 160 });
@@ -107,7 +109,25 @@ export function buildLevel1(levelWidth, height) {
   platforms.push({ x: 3740, y: groundY - 220, width: 110, height: 20 });
   collectibles.push({ type: 'coffee', x: 3782, y: groundY - 256, width: 24, height: 24, healBonus: 60 });
 
+  // Plataformas Táticas na Arena do ATS-9000 (leitura vertical estilo Metal Slug)
+  platforms.push({ x: 4470, y: groundY - 95, width: 135, height: 20 });
+  platforms.push({ x: 4645, y: groundY - 165, width: 120, height: 20 });
+
+  // Caixas Destrutíveis (Legacy Crates com drops estilo Metal Slug)
+  crates.push({ x: 380, y: groundY - 34, width: 34, height: 34, hp: 1, destroyed: false, label: 'LEGACY', drop: 'pickup_f' });
+  crates.push({ x: 930, y: groundY - 34, width: 34, height: 34, hp: 1, destroyed: false, label: 'PDFs', drop: 'coffee' });
+  crates.push({ x: 1860, y: groundY - 34, width: 34, height: 34, hp: 1, destroyed: false, label: 'GIT', drop: 'pickup_g' });
+  crates.push({ x: 2910, y: groundY - 104, width: 34, height: 34, hp: 1, destroyed: false, label: 'NPM', drop: 'pickup_f' });
+  crates.push({ x: 3670, y: groundY - 124, width: 34, height: 34, hp: 1, destroyed: false, label: 'DEPLOY', drop: 'pickup_g' });
+  crates.push({ x: 4250, y: groundY - 109, width: 34, height: 34, hp: 1, destroyed: false, label: 'HOTFIX', drop: 'coffee' });
+
+  // Prisioneiros POWs ("Devs Presos no Loop de Tutoriais")
+  pows.push({ x: 520, y: groundY - 165, width: 34, height: 40, rescued: false, runTimer: 0, spriteKey: 'bg_npc_dev', quip: 'Saí do tutorial infinito!', drop: 'pickup_f' });
+  pows.push({ x: 2260, y: groundY - 125, width: 34, height: 40, rescued: false, runTimer: 0, spriteKey: 'bg_npc_woman', quip: 'Valeu por quebrar o Golem!', drop: 'pickup_g' });
+  pows.push({ x: 2770, y: groundY - 255, width: 34, height: 40, rescued: false, runTimer: 0, spriteKey: 'bg_npc_commuter', quip: 'Commit salvo! Toma café!', drop: 'coffee' });
+  pows.push({ x: 4510, y: groundY - 135, width: 34, height: 40, rescued: false, runTimer: 0, spriteKey: 'bg_npc_dev', quip: 'Derrote o ATS-9000!', drop: 'pickup_f' });
+
   const boss = new Boss(4750, groundY - 130);
 
-  return { platforms, enemies, mentors, collectibles, checkpoints, hazards, boss };
+  return { platforms, enemies, mentors, collectibles, checkpoints, hazards, crates, pows, boss };
 }

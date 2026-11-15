@@ -48,18 +48,19 @@ export class ParallaxBackground {
       { x: 3600, timer: 1.0, interval: 4.5, active: false, t: 0 }
     ];
 
-    // 5. Pessoas, Devs, Cachorro e Ciclista andando pelo calçadão (Mundo Vivo!)
-    this.walkers = [
-      { type: 'dev_coffee', x: 260, dir: 1, speed: 34, shirt: '#1976d2', hair: '#212121', minX: 120, maxX: 900, phase: 0 },
-      { type: 'dog_walker', x: 760, dir: -1, speed: 40, shirt: '#e64a19', hair: '#4e342e', minX: 400, maxX: 1350, phase: 1.2 },
-      { type: 'cyclist', x: 1100, dir: 1, speed: 115, shirt: '#00acc1', hair: '#111', minX: 50, maxX: 4900, phase: 0 },
-      { type: 'dev_laptop', x: 1480, dir: 1, speed: 30, shirt: '#7b1fa2', hair: '#fdd835', minX: 1100, maxX: 2100, phase: 2.1 },
-      { type: 'cat', x: 1750, dir: -1, speed: 22, color: '#ff9800', minX: 1550, maxX: 2200, phase: 0.7 },
-      { type: 'office_worker', x: 2350, dir: -1, speed: 38, shirt: '#37474f', hair: '#1a1a1a', minX: 1900, maxX: 2900, phase: 3.0 },
-      { type: 'dog_walker', x: 2950, dir: 1, speed: 36, shirt: '#2e7d32', hair: '#5d4037', minX: 2500, maxX: 3500, phase: 0.4 },
-      { type: 'dev_coffee', x: 3550, dir: -1, speed: 32, shirt: '#c62828', hair: '#212121', minX: 3100, maxX: 4100, phase: 1.8 },
-      { type: 'cat', x: 4050, dir: 1, speed: 24, color: '#eceff1', minX: 3800, maxX: 4400, phase: 2.5 },
-      { type: 'pigeon_flock', x: 640, dir: 1, speed: 12, minX: 500, maxX: 900, phase: 0 }
+    // 5. Pedestres Hi-Bit caminhando na calçada dos prédios de fundo (apenas cenário, 0.4x parallax)
+    this.bgPedestrians = [
+      { spriteKey: 'bg_npc_dev', x: 220, y: 493, dir: 1, speed: 34, minX: 90, maxX: 680, drawH: 60, phase: 0.0 },
+      { spriteKey: 'bg_npc_exec', x: 420, y: 494, dir: -1, speed: 35, minX: 160, maxX: 820, drawH: 62, phase: 1.0 },
+      { spriteKey: 'bg_npc_woman', x: 560, y: 491, dir: -1, speed: 30, minX: 280, maxX: 920, drawH: 60, phase: 1.4 },
+      { spriteKey: 'bg_npc_commuter', x: 960, y: 494, dir: 1, speed: 36, minX: 700, maxX: 1380, drawH: 62, phase: 2.3 },
+      { spriteKey: 'bg_npc_woman', x: 1320, y: 492, dir: 1, speed: 32, minX: 1050, maxX: 1750, drawH: 60, phase: 0.7 },
+      { spriteKey: 'bg_npc_exec', x: 1520, y: 492, dir: 1, speed: 33, minX: 1200, maxX: 1980, drawH: 62, phase: 2.1 },
+      { spriteKey: 'bg_npc_dev', x: 1680, y: 495, dir: -1, speed: 38, minX: 1400, maxX: 2150, drawH: 61, phase: 3.1 },
+      { spriteKey: 'bg_npc_commuter', x: 2080, y: 491, dir: -1, speed: 31, minX: 1820, maxX: 2520, drawH: 62, phase: 1.9 },
+      { spriteKey: 'bg_npc_dev', x: 2450, y: 494, dir: 1, speed: 35, minX: 2200, maxX: 2850, drawH: 60, phase: 0.5 },
+      { spriteKey: 'bg_npc_exec', x: 2660, y: 493, dir: -1, speed: 34, minX: 2350, maxX: 2980, drawH: 62, phase: 0.2 },
+      { spriteKey: 'bg_npc_woman', x: 2780, y: 492, dir: -1, speed: 33, minX: 2480, maxX: 3050, drawH: 60, phase: 2.7 }
     ];
 
     // 6. Fumaça animada das chaminés
@@ -106,16 +107,16 @@ export class ParallaxBackground {
       }
     }
 
-    // Atualiza Pedestres, Animais e Ciclista
-    for (const w of this.walkers) {
-      w.x += w.dir * w.speed * dt;
-      w.phase += dt * (w.speed * 0.22);
-      if (w.x >= w.maxX) {
-        w.x = w.maxX;
-        w.dir = -1;
-      } else if (w.x <= w.minX) {
-        w.x = w.minX;
-        w.dir = 1;
+    // Atualiza Pedestres de Fundo na calçada
+    for (const p of this.bgPedestrians) {
+      p.x += p.dir * p.speed * dt;
+      p.phase = (p.phase + dt * (p.speed * 0.17)) % 4;
+      if (p.x >= p.maxX) {
+        p.x = p.maxX;
+        p.dir = -1;
+      } else if (p.x <= p.minX) {
+        p.x = p.minX;
+        p.dir = 1;
       }
     }
 
@@ -775,6 +776,9 @@ export class ParallaxBackground {
         }
       }
 
+      // 1b. Pedestres Hi-Bit caminhando pela calçada de fundo (atrás do calçadão principal)
+      this.renderBackgroundPedestrians(ctx, parallaxX);
+
       // 2. Vida no Céu e Chaminés (Nuvens móveis, Gaivotas batendo asas e Fumaça)
       this.renderSkyAndSmoke(ctx);
 
@@ -790,11 +794,11 @@ export class ParallaxBackground {
       // 3b. Animação em tempo real do mar (efeito raster 16-bit de ondas e correnteza)
       this.renderAnimatedSeaOverlay(ctx, fgPng, cameraX, fgTop, fgW, fgH);
 
-      // 4. Vida no Calçadão: Pessoas andando, Devs, Cachorro, Gato, Pombos e Ciclista!
-      this.renderWalkersAndAnimals(ctx, cameraX);
-
-      // 5. Vida no Mar: Barcos a vela, Peixes saltando e Cristas de Espuma Branca
+      // 4. Vida no Mar: Barcos a vela, Peixes saltando e Cristas de Espuma Branca
       this.renderOceanLife(ctx, cameraX);
+
+      // 5. Atmosfera gradual por Zona (Dia -> Crepúsculo Tutoriais -> Noite Corporativa)
+      this.renderZoneAtmosphere(ctx, cameraX);
 
       ctx.restore();
       return;
@@ -941,7 +945,7 @@ export class ParallaxBackground {
     }
   }
 
-  // --- ELEMENTOS VIVOS DO CENÁRIO (NUVENS, PÁSSAROS, PESSOAS, ANIMAIS, BARCOS) ---
+  // --- ELEMENTOS VIVOS DO CENÁRIO (NUVENS, PÁSSAROS, BARCOS) ---
   renderSkyAndSmoke(ctx) {
     ctx.save();
     // 1. Nuvens fofinhas passando no céu
@@ -978,111 +982,57 @@ export class ParallaxBackground {
     ctx.restore();
   }
 
-  renderWalkersAndAnimals(ctx, cameraX) {
-    const walkY = 532; // Parte traseira do calçadão (atrás do jogador)
+  renderBackgroundPedestrians(ctx, parallaxX) {
+    if (!this.renderer || !this.renderer.ext) return;
 
     ctx.save();
-    for (const w of this.walkers) {
-      const sx = Math.floor(w.x - cameraX);
-      if (sx < -120 || sx > this.width + 120) continue;
+    ctx.imageSmoothingEnabled = false;
+    for (const p of this.bgPedestrians) {
+      const sheet = this.renderer.ext(p.spriteKey);
+      if (!sheet || !sheet.width || !sheet.height) continue;
 
-      const step = Math.sin(w.phase);
-      const bob = Math.abs(step) * 2;
+      const sx = Math.floor(p.x - parallaxX);
+      if (sx < -80 || sx > this.width + 80) continue;
 
-      if (w.type === 'cyclist') {
-        // Ciclista pedalando pela rua
-        const wheelRot = Math.floor(this.worldTime * 15) % 2;
-        ctx.fillStyle = 'rgba(0,0,0,0.3)';
-        ctx.fillRect(sx - 16, walkY + 2, 32, 4);
+      const fw = sheet.width / 4;
+      const fh = sheet.height;
+      const frame = Math.floor(p.phase) % 4;
+      const drawH = p.drawH;
+      const drawW = Math.round(fw * (drawH / fh));
 
-        // Rodas
-        ctx.strokeStyle = '#141013';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(sx - 10, walkY - 4, 6, 0, Math.PI * 2);
-        ctx.arc(sx + 10, walkY - 4, 6, 0, Math.PI * 2);
-        ctx.stroke();
+      // Sombra sutil sob os pés na calçada
+      ctx.fillStyle = 'rgba(15, 18, 28, 0.25)';
+      ctx.beginPath();
+      ctx.ellipse(sx, p.y - 1, Math.max(8, drawW * 0.28), 3, 0, 0, Math.PI * 2);
+      ctx.fill();
 
-        // Quadro da bicicleta
-        ctx.fillStyle = '#ff5252';
-        ctx.fillRect(sx - 10, walkY - 12, 20, 3);
-        // Ciclista
-        ctx.fillStyle = w.shirt;
-        ctx.fillRect(sx - 5, walkY - 26 + wheelRot, 10, 14);
-        ctx.fillStyle = '#ffccbc';
-        ctx.fillRect(sx - 3, walkY - 34 + wheelRot, 8, 8);
-        ctx.fillStyle = '#ffd700'; // Capacete
-        ctx.fillRect(sx - 4, walkY - 36 + wheelRot, 10, 4);
-      } else if (w.type === 'cat') {
-        // Gatinho caminhando pela mureta do cais
-        const tailWag = Math.sin(this.worldTime * 6 + w.x) * 3;
-        ctx.fillStyle = w.color;
-        ctx.fillRect(sx - 6, walkY - 8 - bob * 0.5, 12, 6);
-        ctx.fillRect(sx + (w.dir === 1 ? 4 : -8), walkY - 13 - bob * 0.5, 6, 6); // cabeça
-        ctx.fillRect(sx + (w.dir === 1 ? 5 : -7), walkY - 15 - bob * 0.5, 2, 2); // orelha
-        // Rabo
-        ctx.fillRect(sx + (w.dir === 1 ? -9 : 6), walkY - 11 + tailWag * 0.5, 3, 5);
-        // Patinhas
-        ctx.fillRect(sx - 4 + step * 2, walkY - 2, 2, 3);
-        ctx.fillRect(sx + 2 - step * 2, walkY - 2, 2, 3);
-      } else if (w.type === 'pigeon_flock') {
-        // Pombos bicando o chão e saltitando
-        for (let p = 0; p < 3; p++) {
-          const px = sx + p * 18;
-          const hop = Math.abs(Math.sin(this.worldTime * 5 + p)) * 3;
-          ctx.fillStyle = '#90a4ae';
-          ctx.fillRect(px, walkY - 5 - hop, 6, 4);
-          ctx.fillStyle = '#eceff1';
-          ctx.fillRect(px + 4, walkY - 7 - hop, 3, 3);
-        }
-      } else {
-        // Pedestre / Dev caminhando
-        ctx.fillStyle = 'rgba(0,0,0,0.28)';
-        ctx.fillRect(sx - 6, walkY + 2, 12, 3);
-
-        // Pernas animadas
-        ctx.fillStyle = '#263238';
-        ctx.fillRect(sx - 3 + step * 3, walkY - 9, 3, 10);
-        ctx.fillRect(sx + 1 - step * 3, walkY - 9, 3, 10);
-
-        // Tronco / Camisa
-        ctx.fillStyle = w.shirt;
-        ctx.fillRect(sx - 5, walkY - 21 - bob, 10, 12);
-
-        // Cabeça + Cabelo
-        ctx.fillStyle = '#ffccbc';
-        ctx.fillRect(sx - 4, walkY - 29 - bob, 8, 8);
-        ctx.fillStyle = w.hair;
-        ctx.fillRect(sx - 4, walkY - 31 - bob, 8, 4);
-
-        // Acessório (Café, Laptop ou Cachorro na coleira!)
-        if (w.type === 'dev_coffee') {
-          ctx.fillStyle = '#ffffff';
-          ctx.fillRect(sx + (w.dir === 1 ? 6 : -8), walkY - 17 - bob, 4, 5);
-        } else if (w.type === 'dev_laptop') {
-          ctx.fillStyle = '#b0bec5';
-          ctx.fillRect(sx + (w.dir === 1 ? 5 : -9), walkY - 16 - bob, 6, 5);
-        } else if (w.type === 'dog_walker') {
-          const dogX = sx + w.dir * 22;
-          const dogStep = Math.sin(w.phase * 1.4) * 2;
-          // Coleira
-          ctx.strokeStyle = '#ffeb3b';
-          ctx.lineWidth = 1;
-          ctx.beginPath();
-          ctx.moveTo(sx + w.dir * 4, walkY - 14 - bob);
-          ctx.lineTo(dogX, walkY - 8);
-          ctx.stroke();
-
-          // Cachorrinho trotando
-          ctx.fillStyle = '#d7ccc8';
-          ctx.fillRect(dogX - 6, walkY - 9 - Math.abs(dogStep), 12, 6);
-          ctx.fillRect(dogX + (w.dir === 1 ? 4 : -8), walkY - 13 - Math.abs(dogStep), 6, 5); // cabeça
-          ctx.fillStyle = '#8d6e63';
-          ctx.fillRect(dogX - 5 + dogStep, walkY - 3, 2, 4);
-          ctx.fillRect(dogX + 3 - dogStep, walkY - 3, 2, 4);
-        }
-      }
+      ctx.save();
+      ctx.translate(sx, p.y);
+      if (p.dir === -1) ctx.scale(-1, 1);
+      ctx.drawImage(sheet, frame * fw, 0, fw, fh, -drawW / 2, -drawH, drawW, drawH);
+      ctx.restore();
     }
+    ctx.restore();
+  }
+
+  renderZoneAtmosphere(ctx, cameraX) {
+    // Zona 2 (1400..3200): crepúsculo roxo; Zona 3 (>=3200): noite corporativa cibernética
+    const duskT = Math.max(0, Math.min(1, (cameraX - 1200) / 500));
+    const nightT = Math.max(0, Math.min(1, (cameraX - 3000) / 500));
+    if (duskT <= 0 && nightT <= 0) return;
+
+    const r = Math.round(94 * (1 - nightT) + 10 * nightT);
+    const g = Math.round(53 * (1 - nightT) + 22 * nightT);
+    const b = Math.round(177 * (1 - nightT) + 52 * nightT);
+    const alpha = duskT * 0.18 + nightT * 0.18;
+
+    ctx.save();
+    const grad = ctx.createLinearGradient(0, 0, 0, this.height);
+    grad.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${(alpha * 1.25).toFixed(3)})`);
+    grad.addColorStop(0.7, `rgba(${r}, ${g}, ${b}, ${(alpha * 0.65).toFixed(3)})`);
+    grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, this.width, this.height);
     ctx.restore();
   }
 

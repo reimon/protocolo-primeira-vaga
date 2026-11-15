@@ -32,6 +32,7 @@ export class Enemy {
       this.label = 'BUG NA SEXTA';
       this.badgeColor = '#ff1744';
       this.hopTimer = 0;
+      this.quip = 'Funciona na minha máquina!';
     } else if (type === 'ghost') {
       this.width = 46;
       this.height = 50;
@@ -59,6 +60,7 @@ export class Enemy {
       this.hasFrontShield = true;
       this.label = 'VAGA JR: 5 ANOS EXP';
       this.badgeColor = '#ffd700';
+      this.quip = 'Exige 5 anos de IA!';
     } else if (type === 'drone') {
       this.width = 50;
       this.height = 42;
@@ -71,11 +73,13 @@ export class Enemy {
       this.shootTimer = 1.8;
       this.label = 'GHOSTING DO RH';
       this.badgeColor = '#00e5ff';
+      this.quip = 'Retornamos em breve...';
       if (this.y < 330) this.y = 370;
     }
 
     this.animTimer = 0;
     this.animFrame = 1;
+    this.panicTimer = 0;
   }
 
   update(dt, player, platforms, projectiles, soundEngine, particleSystem) {
@@ -84,6 +88,10 @@ export class Enemy {
     this.fxTime += dt;
     if (this.hitTimer > 0) this.hitTimer -= dt;
     if (this.squashTimer > 0) this.squashTimer -= dt;
+    if (this.panicTimer > 0) this.panicTimer -= dt;
+    if (this.type === 'drone' && this.hp <= this.maxHp * 0.5 && particleSystem && Math.random() < 0.25) {
+      particleSystem.createSmoke(this.x + this.width / 2, this.y + this.height * 0.4, 1, '#37474f');
+    }
     if (this.stunTimer > 0) {
       this.stunTimer -= dt;
       if (this.type === 'bug' || this.type === 'golem') {
@@ -95,13 +103,17 @@ export class Enemy {
     if (this.attackCooldown > 0) this.attackCooldown -= dt;
 
     this.animTimer += dt;
-    if (this.animTimer > 0.14) {
+    const frameInterval = this.type === 'drone' ? 0.08 : 0.11;
+    if (this.animTimer > frameInterval) {
       this.animTimer = 0;
-      this.animFrame = this.animFrame === 1 ? 2 : 1;
+      this.animFrame = (this.animFrame % 4) + 1;
     }
 
     const distToPlayer = (player.x + player.width / 2) - (this.x + this.width / 2);
     const absDist = Math.abs(distToPlayer);
+    if ((player.isIaido || player.isDashing) && absDist < 150 && Math.abs(player.y - this.y) < 95) {
+      this.panicTimer = Math.max(this.panicTimer, 0.45);
+    }
 
     // --- IA POR TIPO ---
     if (this.type === 'bug') {
@@ -277,6 +289,18 @@ export class Enemy {
     if (soundEngine) soundEngine.playNoise(0.08, null, 0.12);
   }
 
+  shatterShield(particleSystem, soundEngine) {
+    if (!this.hasFrontShield) return false;
+    this.hasFrontShield = false;
+    this.stunTimer = 0.45;
+    if (soundEngine) soundEngine.playDeflect();
+    if (particleSystem) {
+      particleSystem.createDebris(this.x + this.width / 2, this.y + this.height / 2, ['#ffd700', '#fff59d', '#ff9100'], 8);
+      particleSystem.createDamageNumber(this.x + this.width / 2, this.y - 18, 'ESCUDO QUEBRADO!', '#ffd700');
+    }
+    return true;
+  }
+
   takeDamage(amount, attackFacing, particleSystem, soundEngine) {
     if (this.isDead) return 0;
 
@@ -340,13 +364,19 @@ export class Enemy {
     const isHit = this.hitTimer > 0;
 
     if (this.type === 'bug') {
-      spriteKey = isHit ? 'enemy_bug_hit' : `enemy_bug_walk${this.animFrame}`;
+      if (isHit) spriteKey = 'enemy_bug_hit';
+      else if (this.isAlert && this.hopTimer > 0.70) spriteKey = 'enemy_bug_lunge';
+      else spriteKey = `enemy_bug_walk${this.animFrame}`;
     } else if (this.type === 'ghost') {
       spriteKey = isHit ? 'enemy_ghost_hit' : `enemy_ghost_float${this.animFrame}`;
     } else if (this.type === 'golem') {
-      spriteKey = isHit ? 'enemy_golem_hit' : (this.animFrame === 1 ? 'enemy_golem_stand' : 'enemy_golem_walk');
+      if (isHit) spriteKey = 'enemy_golem_hit';
+      else if (!this.hasFrontShield) spriteKey = `enemy_golem_noshield${this.animFrame}`;
+      else spriteKey = `enemy_golem_walk${this.animFrame}`;
     } else if (this.type === 'drone') {
-      spriteKey = isHit ? 'enemy_drone_hit' : `enemy_drone_fly${this.animFrame}`;
+      if (isHit) spriteKey = 'enemy_drone_hit';
+      else if (this.shootTimer < 0.38) spriteKey = 'enemy_drone_charge';
+      else spriteKey = `enemy_drone_fly${this.animFrame}`;
     }
 
     const sprite = renderer.get(spriteKey);
@@ -366,11 +396,21 @@ export class Enemy {
     ctx.fill();
     ctx.restore();
 
-    // 2. Renderização do Sprite com Escala Hi-Bit e Squash & Stretch
+    // 2. Renderização do Sprite com Escala Hi-Bit, Hit Flash e Telegraph
     ctx.save();
     ctx.imageSmoothingEnabled = false;
     if (this.type === 'ghost') {
       ctx.globalAlpha = 0.85;
+    }
+    const isTelegraphing =
+      (this.type === 'drone' && this.shootTimer < 0.38) ||
+      (this.type === 'bug' && this.isAlert && this.hopTimer > 0.70);
+
+    if (this.hitTimer > 0.10) {
+      ctx.filter = 'brightness(3.0) contrast(0.3)';
+    } else if (isTelegraphing) {
+      ctx.shadowColor = '#ff1744';
+      ctx.shadowBlur = 14;
     }
 
     ctx.translate(Math.round(centerX), Math.round(footY));
@@ -403,7 +443,22 @@ export class Enemy {
       if (this.isAlert) {
         ctx.fillStyle = '#ff1744';
         ctx.fillRect(centerX - 3, screenY + 6, 6, 6);
+        ctx.font = 'bold 9px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#80deea';
+        ctx.fillText(this.quip, centerX, screenY - 27);
       }
+      if (this.shootTimer < 0.38) {
+        ctx.fillStyle = '#ffea00';
+        ctx.font = 'bold 12px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('!', centerX, screenY - 38);
+      }
+    } else if (this.type === 'golem' && this.isAlert) {
+      ctx.font = 'bold 9px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#ffe082';
+      ctx.fillText(this.quip, centerX, screenY - 27);
     } else if (this.type === 'ghost' && this.isAlert) {
       // Sussurro da Síndrome do Impostor flutuando
       ctx.font = 'bold 9px monospace';
@@ -414,7 +469,13 @@ export class Enemy {
       ctx.font = 'bold 9px monospace';
       ctx.textAlign = 'center';
       ctx.fillStyle = '#ff5252';
-      ctx.fillText('ERR_500!', centerX, screenY - 25);
+      ctx.fillText(this.hopTimer > 0.70 ? '! ' + this.quip : this.quip, centerX, screenY - 27);
+    }
+    if (this.panicTimer > 0) {
+      ctx.font = 'bold 12px "Press Start 2P", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#ffea00';
+      ctx.fillText('?!', centerX, screenY - 40);
     }
     ctx.restore();
 

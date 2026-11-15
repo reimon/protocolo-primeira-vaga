@@ -14,6 +14,7 @@ export class OverlayScreens {
         <p class="flavor-text">Você derrotou o ATS-9000 e provou seu valor técnico!</p>
         <div class="score-summary">
           <div>Inimigos Superados: ${stats.enemiesDefeated}</div>
+          <div>Devs Resgatados (POWs): ${stats.devsRescued || 0}</div>
           <div>Combo Máximo: ${stats.maxCombo} Hits</div>
           <div>Tempo Total: ${Math.floor(stats.timeElapsed)}s</div>
           <div class="final-score">PONTUAÇÃO FINAL: ${finalScore}</div>
