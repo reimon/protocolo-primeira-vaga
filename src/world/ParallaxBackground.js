@@ -38,14 +38,18 @@ export class ParallaxBackground {
     this.boats = [
       { x: 350, y: 632, speed: 18, dir: 1, sailColor: '#ffffff', hullColor: '#8d6e63' },
       { x: 1850, y: 642, speed: 14, dir: -1, sailColor: '#ffd54f', hullColor: '#5d4037' },
-      { x: 3400, y: 636, speed: 22, dir: 1, sailColor: '#80deea', hullColor: '#455a64' }
+      { x: 3400, y: 636, speed: 22, dir: 1, sailColor: '#80deea', hullColor: '#455a64' },
+      { x: 5400, y: 640, speed: 16, dir: -1, sailColor: '#ffab91', hullColor: '#4e342e' },
+      { x: 7400, y: 634, speed: 20, dir: 1, sailColor: '#fff59d', hullColor: '#37474f' }
     ];
 
     // 4. Peixes / Golfinhos saltando na água
     this.jumpingFish = [
       { x: 520, timer: 0, interval: 4.2, active: false, t: 0 },
       { x: 1900, timer: 2.0, interval: 5.0, active: false, t: 0 },
-      { x: 3600, timer: 1.0, interval: 4.5, active: false, t: 0 }
+      { x: 3600, timer: 1.0, interval: 4.5, active: false, t: 0 },
+      { x: 5600, timer: 2.5, interval: 4.8, active: false, t: 0 },
+      { x: 7800, timer: 0.6, interval: 4.3, active: false, t: 0 }
     ];
 
     // 5. Pedestres Hi-Bit caminhando na calçada dos prédios de fundo (apenas cenário, 0.4x parallax)
@@ -60,7 +64,11 @@ export class ParallaxBackground {
       { spriteKey: 'bg_npc_commuter', x: 2080, y: 491, dir: -1, speed: 31, minX: 1820, maxX: 2520, drawH: 62, phase: 1.9 },
       { spriteKey: 'bg_npc_dev', x: 2450, y: 494, dir: 1, speed: 35, minX: 2200, maxX: 2850, drawH: 60, phase: 0.5 },
       { spriteKey: 'bg_npc_exec', x: 2660, y: 493, dir: -1, speed: 34, minX: 2350, maxX: 2980, drawH: 62, phase: 0.2 },
-      { spriteKey: 'bg_npc_woman', x: 2780, y: 492, dir: -1, speed: 33, minX: 2480, maxX: 3050, drawH: 60, phase: 2.7 }
+      { spriteKey: 'bg_npc_woman', x: 2780, y: 492, dir: -1, speed: 33, minX: 2480, maxX: 3050, drawH: 60, phase: 2.7 },
+      { spriteKey: 'bg_npc_dev', x: 3180, y: 493, dir: 1, speed: 34, minX: 2950, maxX: 3550, drawH: 60, phase: 1.1 },
+      { spriteKey: 'bg_npc_exec', x: 3520, y: 494, dir: -1, speed: 36, minX: 3280, maxX: 3920, drawH: 62, phase: 0.4 },
+      { spriteKey: 'bg_npc_commuter', x: 3960, y: 492, dir: 1, speed: 33, minX: 3680, maxX: 4320, drawH: 62, phase: 2.2 },
+      { spriteKey: 'bg_npc_woman', x: 4350, y: 491, dir: -1, speed: 31, minX: 4050, maxX: 4680, drawH: 60, phase: 1.6 }
     ];
 
     // 6. Fumaça animada das chaminés
@@ -88,8 +96,8 @@ export class ParallaxBackground {
     // Atualiza Barcos
     for (const boat of this.boats) {
       boat.x += boat.dir * boat.speed * dt;
-      if (boat.dir === 1 && boat.x > 5200) boat.x = -100;
-      if (boat.dir === -1 && boat.x < -100) boat.x = 5200;
+      if (boat.dir === 1 && boat.x > 9600) boat.x = -100;
+      if (boat.dir === -1 && boat.x < -100) boat.x = 9600;
     }
 
     // Atualiza Peixes saltando
@@ -1016,9 +1024,9 @@ export class ParallaxBackground {
   }
 
   renderZoneAtmosphere(ctx, cameraX) {
-    // Zona 2 (1400..3200): crepúsculo roxo; Zona 3 (>=3200): noite corporativa cibernética
-    const duskT = Math.max(0, Math.min(1, (cameraX - 1200) / 500));
-    const nightT = Math.max(0, Math.min(1, (cameraX - 3000) / 500));
+    // Zona 2 (2800..6000): crepúsculo roxo; Zona 3 (>=6000): noite corporativa cibernética
+    const duskT = Math.max(0, Math.min(1, (cameraX - 2200) / 600));
+    const nightT = Math.max(0, Math.min(1, (cameraX - 5400) / 600));
     if (duskT <= 0 && nightT <= 0) return;
 
     const r = Math.round(94 * (1 - nightT) + 10 * nightT);

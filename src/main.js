@@ -8,7 +8,7 @@ import { SoundEngine } from './audio/SoundEngine.js';
 import { ParallaxBackground } from './world/ParallaxBackground.js';
 import { ParticleSystem, ScreenShake } from './world/ParticleSystem.js';
 import { LoadingScene } from './world/LoadingScene.js';
-import { buildLevel1 } from './world/Level1.js';
+import { buildLevel1, LEVEL1_CONFIG } from './world/Level1.js';
 import { WorldRenderer } from './world/WorldRenderer.js';
 import { updateDestructibles, hitDestructible, rescuePow as rescuePowEntity, explodeArea } from './world/Destructibles.js';
 import { Player } from './entities/Player.js';
@@ -57,7 +57,7 @@ class Game {
 
     // Mundo e Câmera
     this.cameraX = 0;
-    this.levelWidth = 5200;
+    this.levelWidth = LEVEL1_CONFIG.width;
     this.player = null;
     this.boss = null;
     this.mentors = [];
@@ -71,6 +71,8 @@ class Game {
     this.pows = [];
     this.activeCheckpoint = null;
     this.currentZone = 1;
+    this.bossFightActive = false;
+    this.chefeLoucaIntroTriggered = false;
     this.zoneBanner = null;
 
     this.stats = {
@@ -179,6 +181,11 @@ class Game {
     this.combo = { count: 0, timer: 0, maxTimer: 2.6 };
     this.activeCheckpoint = { x: 80, y: this.height - 220, zone: 1, label: 'Início' };
     this.currentZone = 1;
+    this.bossFightActive = false;
+    this.chefeLoucaIntroTriggered = false;
+    this.input.left = false;
+    this.input.right = false;
+    this.input.jump = false;
     this.showZoneBanner('ZONA 1', 'A Vila da Procrastinação');
 
     this.buildLevel();
@@ -277,6 +284,14 @@ class Game {
     this.updateMovingPlatforms(worldDt);
     this.player.update(playerDt, this.input, this.platforms, this.sound, this.particles);
 
+    if (this.state === 'BOSS_FIGHT' && this.bossFightActive) {
+      const arenaLeft = Math.max(0, LEVEL1_CONFIG.bossTriggerX - 480);
+      if (this.player.x < arenaLeft) {
+        this.player.x = arenaLeft;
+        if (this.player.vx < 0) this.player.vx = 0;
+      }
+    }
+
     if (this.player.pendingProjectile) {
       this.projectiles.push(this.player.pendingProjectile);
       this.player.pendingProjectile = null;
@@ -309,6 +324,7 @@ class Game {
       mentor.update(worldDt, this.player, this.particles, this.sound, (m) => this.openMentorDialog(m));
     }
 
+    this.checkChefeLoucaIntroDialog();
     this.updateEnemies(worldDt);
     if (this.updateCollectibles()) return;
     this.updateProjectiles(worldDt);
@@ -420,10 +436,55 @@ class Game {
     const groundY = this.height - 160;
     for (let i = this.projectiles.length - 1; i >= 0; i--) {
       const p = this.projectiles[i];
+      if (p.type === 'boss_missile' && p.isEnemy && (p.homingTime || 0) > 0 && this.player) {
+        p.homingTime -= dt;
+        const tx = (this.player.x + this.player.width / 2) - (p.x + p.width / 2);
+        const ty = (this.player.y + this.player.height / 2) - (p.y + p.height / 2);
+        const dist = Math.hypot(tx, ty) || 1;
+        p.vx += (tx / dist) * 340 * dt;
+        p.vy += (ty / dist) * 340 * dt;
+        const spd = Math.hypot(p.vx, p.vy) || 1;
+        const maxSpd = 265;
+        if (spd > maxSpd) {
+          p.vx = (p.vx / spd) * maxSpd;
+          p.vy = (p.vy / spd) * maxSpd;
+        }
+        if (Math.random() < 0.35) {
+          this.particles.createSmoke(p.x + p.width / 2, p.y + p.height / 2, 1, '#90a4ae');
+        }
+      }
+
       p.x += p.vx * dt;
       p.y += p.vy * dt;
       if (p.gravity) p.vy += p.gravity * dt;
       p.life -= dt;
+
+      if (p.type === 'boss_mortar') {
+        const hitFloor = p.y + p.height >= groundY;
+        const hitPlayer = this.player.checkAABB(this.player, p);
+        if (hitFloor || hitPlayer || p.life <= 0) {
+          const cx = p.x + p.width / 2;
+          const cy = hitFloor ? groundY : p.y + p.height / 2;
+          this.particles.createExplosion(cx, cy, 0.95, groundY);
+          if (this.particles.createShockwaveRing) {
+            this.particles.createShockwaveRing(cx, cy - 6, 62, '#ff6d00', 0.25);
+          }
+          this.screenShake.trigger(8, 0.2);
+          this.sound.playNoise(0.14, null, 0.25);
+          const pCx = this.player.x + this.player.width / 2;
+          const pCy = this.player.y + this.player.height / 2;
+          if (hitPlayer || Math.hypot(pCx - cx, pCy - cy) <= 58) {
+            const dmg = this.player.takeDamage(p.damage || 18, this.sound, this.screenShake);
+            if (dmg > 0) {
+              this.combo.count = 0;
+              this.combo.timer = 0;
+              this.particles.createDamageNumber(this.player.x, this.player.y - 10, dmg, '#ff1744');
+            }
+          }
+          this.projectiles.splice(i, 1);
+        }
+        continue;
+      }
 
       if (p.type === 'git_bomb') {
         const hitFloor = p.y + p.height >= groundY;
@@ -485,6 +546,12 @@ class Game {
         continue;
       }
 
+      if (p.isEnemy && (p.type === 'vulcan' || p.type === 'boss_missile') && p.y + p.height >= groundY) {
+        this.particles.createSparks(p.x + p.width / 2, groundY - 4, '#ff9100', 6);
+        this.projectiles.splice(i, 1);
+        continue;
+      }
+
       if (p.life <= 0) {
         this.projectiles.splice(i, 1);
       }
@@ -492,8 +559,9 @@ class Game {
   }
 
   updateBossFight(dt) {
-    if (this.state === 'PLAYING' && this.player.x > 4400) {
+    if (this.state === 'PLAYING' && this.player.x > LEVEL1_CONFIG.bossTriggerX) {
       this.state = 'BOSS_FIGHT';
+      this.bossFightActive = true;
       this.sound.startBgm('boss');
       this.stats.activeMentorTip = 'DERROTE O ATS-9000! Quebre as barreiras algorítmicas!';
     }
@@ -629,8 +697,68 @@ class Game {
     }
   }
 
+  checkChefeLoucaIntroDialog() {
+    if (this.chefeLoucaIntroTriggered || this.state !== 'PLAYING' || !this.player) return;
+    const chefe = this.enemies.find(e =>
+      !e.isDead &&
+      (e.type === 'blonde_glasses' || e.type === 'blonde_tongue') &&
+      Math.abs((e.x + e.width / 2) - (this.player.x + this.player.width / 2)) < 260
+    );
+    if (!chefe) return;
+
+    this.chefeLoucaIntroTriggered = true;
+    const isFemale = this.player.gender === 'female';
+    const heroName = isFemale ? 'HEROÍNA DEV' : 'HERÓI DEV';
+    this.player.facing = chefe.x >= this.player.x ? 1 : -1;
+    chefe.facing = this.player.x >= chefe.x ? 1 : -1;
+
+    this.openMentorDialog({
+      data: {
+        openSound: 'alert',
+        lines: [
+          {
+            speaker: 'CHEFE LOUCA',
+            portrait: 'chefe_louca',
+            color: '#ffd54f',
+            text: 'Ei, júnior! Preciso pra ONTEM de todos os relatórios do mês, visitar 5 clientes, fechar as planilhas e subir o deploy — tudo ao mesmo tempo!'
+          },
+          {
+            speaker: heroName,
+            portrait: 'hero',
+            color: '#00e5ff',
+            text: 'Chefe, tudo isso ao mesmo tempo?! É coisa demais para fazer em tão pouco tempo... ninguém consegue entregar tudo junto!'
+          },
+          {
+            speaker: 'CHEFE LOUCA',
+            portrait: 'chefe_louca',
+            color: '#ffd54f',
+            text: 'Como assim não dá?! Usa Inteligência Artificial! Pede pra IA fazer todos os relatórios em 5 minutos e já sai visitando os clientes!'
+          },
+          {
+            speaker: heroName,
+            portrait: 'hero',
+            color: '#00e5ff',
+            text: 'Mesmo usando IA ainda não dá tempo de revisar, corrigir os erros e visitar todo mundo na correria! Só na base da Espada de Lógica!'
+          },
+          {
+            speaker: 'CHEFE LOUCA',
+            portrait: 'chefe_louca',
+            color: '#ff4081',
+            text: 'SEM DESCULPAS! Quero tudo na minha mesa AGORA — ou vai enfrentar a fúria da gestão!'
+          }
+        ],
+        onFinish: ({ stats }) => {
+          stats.activeMentorTip = 'Enfrente a CHEFE LOUCA e sobreviva às cobranças impossíveis!';
+        }
+      }
+    });
+  }
+
   openMentorDialog(mentor) {
     this.state = 'MENTOR_DIALOG';
+    this.input.left = false;
+    this.input.right = false;
+    this.input.jump = false;
     this.dialog.open(mentor);
   }
 
@@ -645,7 +773,7 @@ class Game {
         });
         if (!finished) return;
 
-        if (this.boss && !this.boss.isDead) {
+        if (this.bossFightActive && this.boss && !this.boss.isDead) {
           this.state = 'BOSS_FIGHT';
           this.sound.startBgm('boss');
           this.stats.activeMentorTip = 'PORTFÓLIO LENDÁRIO ATIVO! DERROTE O ATS-9000!';
@@ -663,7 +791,7 @@ class Game {
     } catch (err) {
       console.error('Erro ao avançar diálogo:', err);
       this.dialog.reset();
-      this.state = (this.boss && !this.boss.isDead) ? 'BOSS_FIGHT' : 'PLAYING';
+      this.state = (this.bossFightActive && this.boss && !this.boss.isDead) ? 'BOSS_FIGHT' : 'PLAYING';
     }
   }
 
@@ -738,12 +866,13 @@ class Game {
     this.projectiles = [];
 
     if (this.boss && !this.boss.isDead) {
-      this.boss = new Boss(4750, this.height - 160 - 130);
+      this.boss = new Boss(LEVEL1_CONFIG.bossSpawnX, this.height - 160 - 130);
     }
 
     this.cameraX = Math.max(0, Math.min(this.player.x - this.width * 0.35, this.levelWidth - this.width));
-    this.state = 'PLAYING';
-    this.sound.startBgm('stage');
+    this.bossFightActive = this.player.x > LEVEL1_CONFIG.bossTriggerX;
+    this.state = this.bossFightActive ? 'BOSS_FIGHT' : 'PLAYING';
+    this.sound.startBgm(this.bossFightActive ? 'boss' : 'stage');
     this.stats.activeMentorTip = `Retomando do commit: ${this.activeCheckpoint.label}!`;
     HudController.updateHUD(this.player, this.stats);
   }
@@ -754,10 +883,10 @@ class Game {
 
   updateZoneProgress() {
     if (!this.player) return;
-    if (this.currentZone < 2 && this.player.x >= 1600) {
+    if (this.currentZone < 2 && this.player.x >= LEVEL1_CONFIG.zone2Start) {
       this.currentZone = 2;
       this.showZoneBanner('ZONA 2', 'Floresta dos Tutoriais Infinitos');
-    } else if (this.currentZone < 3 && this.player.x >= 3400) {
+    } else if (this.currentZone < 3 && this.player.x >= LEVEL1_CONFIG.zone3Start) {
       this.currentZone = 3;
       this.showZoneBanner('ZONA 3', 'Cidadela Corporativa & Arena do RH');
     }
@@ -886,7 +1015,7 @@ class Game {
       WorldRenderer.renderZoneBanner(this.ctx, this.zoneBanner, this.width);
     }
     if (this.state === 'MENTOR_DIALOG') {
-      this.dialog.render(this.ctx, this.renderer, this.width, this.height);
+      this.dialog.render(this.ctx, this.renderer, this.width, this.height, this.player?.gender || 'male');
     }
 
     this.ctx.restore();

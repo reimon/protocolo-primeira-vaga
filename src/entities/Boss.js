@@ -9,11 +9,17 @@ export class Boss {
   constructor(x, y) {
     this.x = x;
     this.y = y;
+    this.homeX = x;
     this.baseY = y;
     this.width = 110;
     this.height = 115;
-    this.maxHp = 500;
-    this.hp = 500;
+    this.arenaMinX = Math.max(40, x - 520);
+    this.arenaMaxX = x + 160;
+    this.facing = -1; // -1: esquerda, 1: direita
+    this.vx = 0;
+
+    this.maxHp = 1400;
+    this.hp = 1400;
     this.phase = 1; // 1 ou 2
     this.isDead = false;
     this.deathFinished = false;
@@ -21,22 +27,37 @@ export class Boss {
     this.deathSinkY = 0;
     this.hitTimer = 0;
 
-    // Estados: 'idle', 'laser_barrage', 'ground_slam', 'email_storm', 'recovering', 'mentor_event'
+    // Estados: 'idle', 'laser_barrage', 'vulcan_burst', 'mortar_barrage', 'missile_salvo', 'ground_slam', 'email_storm', 'mega_beam', 'charge_rush', 'recovering', 'mentor_event'
     this.state = 'idle';
-    this.stateTimer = 2.0;
+    this.stateTimer = 0.85;
     this.hoverTimer = 0;
+    this.lastAttack = null;
 
     // Intervenção do Mentor & Módulos Destrutíveis
     this.mentorEventTriggered = false;
     this.isCoreExposed = false;
     this.moduleBroken = false;
 
-    // Ataque
+    // Controle de Ataques Estilo Metal Slug
     this.attackCycle = 0;
     this.slamVy = 0;
     this.isSlamming = false;
+    this.slamTargetX = x;
     this.laserTimer = 0.45;
     this.stormFired = false;
+
+    this.vulcanShotsLeft = 0;
+    this.vulcanTimer = 0;
+    this.aimAngle = Math.PI;
+    this.mortarShotsLeft = 0;
+    this.mortarTimer = 0;
+    this.missileFired = false;
+    this.beamActive = false;
+    this.beamY = y + 44;
+    this.beamDamageCooldown = 0;
+    this.chargePhase = 'windup';
+    this.chargeDir = -1;
+
     this.deathExplosionCount = 0;
     this.deathExplosionTimer = 0;
   }
@@ -80,7 +101,16 @@ export class Boss {
     }
 
     if (this.hitTimer > 0) this.hitTimer -= dt;
+    if (this.beamDamageCooldown > 0) this.beamDamageCooldown -= dt;
     this.hoverTimer += dt * 2.5;
+
+    const playerCx = player.x + player.width / 2;
+    const bossCx = this.x + this.width / 2;
+    if (this.state !== 'charge_rush' && this.state !== 'mega_beam') {
+      if (Math.abs(playerCx - bossCx) > 24) {
+        this.facing = playerCx < bossCx ? -1 : 1;
+      }
+    }
 
     // Fumaça contínua quando o módulo de Filtro de Palavra-Chave é quebrado
     if (this.moduleBroken && particleSystem && Math.random() < 0.22) {
@@ -91,6 +121,7 @@ export class Boss {
     if (this.hp <= this.maxHp * 0.5 && !this.mentorEventTriggered) {
       this.mentorEventTriggered = true;
       this.phase = 2;
+      this.beamActive = false;
       this.state = 'mentor_event';
       this.stateTimer = 4.5;
       if (onMentorIntervention) {
@@ -101,68 +132,133 @@ export class Boss {
 
     this.stateTimer -= dt;
 
-    // Máquina de Estados do Boss
+    // Máquina de Estados do Boss (Estilo Metal Slug)
     switch (this.state) {
-      case 'idle':
+      case 'idle': {
         this.y = this.baseY + Math.sin(this.hoverTimer) * 12;
         this.isCoreExposed = false;
+        this.beamActive = false;
+        // Patrulha aérea tática mantendo distância média do player
+        const desiredDist = 330;
+        const idealX = playerCx < bossCx ? playerCx + desiredDist : playerCx - desiredDist - this.width;
+        const clampedIdeal = Math.max(this.arenaMinX, Math.min(this.arenaMaxX, idealX));
+        const dx = clampedIdeal - this.x;
+        this.vx = Math.max(-130, Math.min(130, dx * 2.2));
+        this.x = Math.max(this.arenaMinX, Math.min(this.arenaMaxX, this.x + this.vx * dt));
         if (this.stateTimer <= 0) {
           this.chooseNextAttack(player);
         }
         break;
+      }
 
       case 'laser_barrage':
-        this.y = this.baseY + Math.sin(this.hoverTimer) * 6;
-        // Dispara lasers em intervalo fixo baseado em dt (independente de Hz do monitor)
+        this.y = this.baseY + Math.sin(this.hoverTimer) * 8;
         this.laserTimer -= dt;
         if (this.laserTimer <= 0) {
-          this.laserTimer = this.phase === 2 ? 0.32 : 0.50;
+          this.laserTimer = this.phase === 2 ? 0.24 : 0.36;
           this.fireResumeLaser(projectiles, player, soundEngine);
         }
         if (this.stateTimer <= 0) {
           if (this.phase === 2) {
-            this.state = 'recovering';
-            this.stateTimer = 3.2;
-            this.isCoreExposed = true;
+            this.enterRecovering(2.0);
           } else {
             this.state = 'idle';
-            this.stateTimer = 1.8;
+            this.stateTimer = 0.65;
           }
+        }
+        break;
+
+      case 'vulcan_burst': {
+        this.y = this.baseY + Math.sin(this.hoverTimer) * 6;
+        // Windup inicial trava a mira no Player antes da rajada
+        if (this.stateTimer > 1.35) {
+          const targetAngle = Math.atan2(
+            (player.y + player.height * 0.5) - (this.y + 52),
+            playerCx - bossCx
+          );
+          this.aimAngle = targetAngle;
+        } else if (this.vulcanShotsLeft > 0) {
+          this.vulcanTimer -= dt;
+          if (this.vulcanTimer <= 0) {
+            this.vulcanTimer = this.phase === 2 ? 0.08 : 0.10;
+            this.vulcanShotsLeft--;
+            this.fireVulcanRound(projectiles, soundEngine, particleSystem);
+          }
+        }
+        if (this.stateTimer <= 0) {
+          if (this.phase === 2 && this.attackCycle % 2 === 0) {
+            this.enterRecovering(1.9);
+          } else {
+            this.state = 'idle';
+            this.stateTimer = 0.60;
+          }
+        }
+        break;
+      }
+
+      case 'mortar_barrage':
+        this.y = this.baseY + Math.sin(this.hoverTimer * 1.4) * 8;
+        if (this.stateTimer <= 1.55 && this.mortarShotsLeft > 0) {
+          this.mortarTimer -= dt;
+          if (this.mortarTimer <= 0) {
+            this.mortarTimer = this.phase === 2 ? 0.19 : 0.25;
+            this.mortarShotsLeft--;
+            this.fireMortarShell(projectiles, player, soundEngine, particleSystem);
+          }
+        }
+        if (this.stateTimer <= 0) {
+          if (this.phase === 2) {
+            this.enterRecovering(2.0);
+          } else {
+            this.state = 'idle';
+            this.stateTimer = 0.65;
+          }
+        }
+        break;
+
+      case 'missile_salvo':
+        this.y = this.baseY + Math.sin(this.hoverTimer) * 8;
+        if (!this.missileFired && this.stateTimer <= 1.15) {
+          this.missileFired = true;
+          this.fireMissileSalvo(projectiles, player, soundEngine, particleSystem);
+        }
+        if (this.stateTimer <= 0) {
+          this.state = 'idle';
+          this.stateTimer = 0.65;
         }
         break;
 
       case 'ground_slam':
         if (!this.isSlamming) {
-          // Sobe para o alto
-          this.y -= 140 * dt;
-          if (this.stateTimer <= 1.2) {
+          this.y -= 170 * dt;
+          // Persegue horizontalmente o Player enquanto sobe
+          const targetX = Math.max(this.arenaMinX, Math.min(this.arenaMaxX, playerCx - this.width / 2));
+          this.x += (targetX - this.x) * Math.min(1, dt * 3.5);
+          if (this.stateTimer <= 1.1) {
             this.isSlamming = true;
-            this.slamVy = 850;
+            this.slamVy = this.phase === 2 ? 980 : 880;
           }
         } else {
-          // Despenca em direção ao solo
           this.y += this.slamVy * dt;
           if (this.y >= this.baseY) {
             this.y = this.baseY;
             this.isSlamming = false;
-            // Impacto no chão: treme a tela e solta ondas de choque
-            screenShake.trigger(16, 0.45);
-            soundEngine.playNoise(0.25, null, 0.4);
-            soundEngine.playHit();
+            if (screenShake) screenShake.trigger(18, 0.5);
+            if (soundEngine) {
+              soundEngine.playNoise(0.25, null, 0.4);
+              soundEngine.playHit();
+            }
             this.createShockwaves(projectiles);
             if (particleSystem) {
               const cx = this.x + this.width / 2;
               const cy = this.y + this.height;
-              particleSystem.createExplosion(cx, cy, 1.15, this.baseY + this.height);
-              particleSystem.createDust(cx, cy, 10);
+              particleSystem.createExplosion(cx, cy, 1.25, this.baseY + this.height);
+              particleSystem.createDust(cx, cy, 12);
               if (particleSystem.createShockwaveRing) {
-                particleSystem.createShockwaveRing(cx, cy - 6, 110, '#ff1744', 0.34);
+                particleSystem.createShockwaveRing(cx, cy - 6, 120, '#ff1744', 0.36);
               }
             }
-            // Fica vulnerável após o Slam!
-            this.state = 'recovering';
-            this.stateTimer = 3.5;
-            this.isCoreExposed = true;
+            this.enterRecovering(this.phase === 2 ? 2.1 : 1.9);
           }
         }
         break;
@@ -174,15 +270,72 @@ export class Boss {
           this.fireEmailStorm(projectiles, enemies, soundEngine, particleSystem);
         }
         if (this.stateTimer <= 0) {
-          this.state = 'recovering';
-          this.stateTimer = 2.8;
-          this.isCoreExposed = true;
+          this.enterRecovering(2.0);
+        }
+        break;
+
+      case 'mega_beam': {
+        this.y = this.baseY - 12;
+        this.beamY = this.y + 44;
+        if (this.stateTimer > 1.25) {
+          // Carregamento com faíscas no núcleo
+          this.beamActive = false;
+          if (particleSystem && Math.random() < 0.55) {
+            const muzzleX = this.facing === -1 ? this.x + 8 : this.x + this.width - 8;
+            particleSystem.createSparks(muzzleX, this.beamY + 14, '#ffea00', 3);
+          }
+        } else {
+          if (!this.beamActive && soundEngine) {
+            soundEngine.playNoise(0.32, null, 0.4);
+            if (screenShake) screenShake.trigger(12, 0.4);
+          }
+          this.beamActive = true;
+          const beamRect = this.getMegaBeamHitbox();
+          if (beamRect && this.beamDamageCooldown <= 0 && this.checkAABB(beamRect, player)) {
+            const dmg = player.takeDamage(28, soundEngine, screenShake);
+            if (dmg > 0 && particleSystem) {
+              particleSystem.createDamageNumber(player.x, player.y - 12, dmg, '#ff1744');
+            }
+            this.beamDamageCooldown = 0.40;
+          }
+        }
+        if (this.stateTimer <= 0) {
+          this.beamActive = false;
+          this.enterRecovering(2.1);
+        }
+        break;
+      }
+
+      case 'charge_rush':
+        if (this.chargePhase === 'windup') {
+          this.y = this.baseY + 8;
+          if (this.stateTimer <= 0.75) {
+            this.chargePhase = 'dash';
+            if (soundEngine) soundEngine.playNoise(0.2, null, 0.3);
+            if (screenShake) screenShake.trigger(8, 0.25);
+          }
+        } else {
+          this.y = this.baseY + 4;
+          const rushSpeed = this.phase === 2 ? 620 : 500;
+          this.x += this.chargeDir * rushSpeed * dt;
+          if (particleSystem && Math.random() < 0.7) {
+            const tailX = this.chargeDir === -1 ? this.x + this.width : this.x;
+            particleSystem.createSmoke(tailX, this.y + this.height - 20, 1, '#ff6d00');
+          }
+          const hitArenaWall =
+            (this.chargeDir === -1 && this.x <= this.arenaMinX) ||
+            (this.chargeDir === 1 && this.x >= this.arenaMaxX);
+          if (hitArenaWall || this.stateTimer <= 0) {
+            this.x = Math.max(this.arenaMinX, Math.min(this.arenaMaxX, this.x));
+            this.enterRecovering(1.9);
+          }
         }
         break;
 
       case 'recovering':
         // Núcleo sobrecarregado aberto para dano crítico!
         this.y = this.baseY;
+        this.beamActive = false;
         this.isCoreExposed = true;
         if (Math.random() < 0.25 && particleSystem) {
           particleSystem.createSparks(
@@ -194,7 +347,7 @@ export class Boss {
         }
         if (this.stateTimer <= 0) {
           this.state = 'idle';
-          this.stateTimer = 1.5;
+          this.stateTimer = this.phase === 2 ? 0.45 : 0.65;
           this.isCoreExposed = false;
         }
         break;
@@ -202,6 +355,7 @@ export class Boss {
       case 'mentor_event':
         // Pausado temporariamente para o Mentor falar
         this.y = this.baseY;
+        this.beamActive = false;
         if (this.stateTimer <= 0) {
           this.state = 'idle';
           this.stateTimer = 1.0;
@@ -227,73 +381,268 @@ export class Boss {
           particleSystem.createDamageNumber(player.x + 10, this.y - 16, `STOMP -${stompDmg}`, '#00e5ff');
         }
       } else {
-        player.takeDamage(24, soundEngine, screenShake);
+        const contactDmg = this.state === 'charge_rush' ? 32 : (this.phase === 2 ? 30 : 26);
+        player.takeDamage(contactDmg, soundEngine, screenShake);
       }
     }
   }
 
+  enterRecovering(duration = 2.8) {
+    this.state = 'recovering';
+    this.stateTimer = duration;
+    this.isCoreExposed = true;
+    this.beamActive = false;
+  }
+
+  getMegaBeamHitbox() {
+    if (!this.beamActive) return null;
+    const beamLen = 780;
+    const x = this.facing === -1 ? this.x - beamLen + 12 : this.x + this.width - 12;
+    return { x, y: this.beamY, width: beamLen, height: 30 };
+  }
+
   chooseNextAttack(player) {
     this.attackCycle++;
-    if (this.phase === 2 && this.attackCycle % 3 === 0) {
-      this.state = 'email_storm';
-      this.stateTimer = 1.95;
-      this.stormFired = false;
-    } else if (this.phase === 2 && this.attackCycle % 2 === 0) {
-      // Fase 2 faz Ground Slam com ondas de choque
-      this.state = 'ground_slam';
-      this.stateTimer = 2.2;
-      this.isSlamming = false;
+    const playerCx = player.x + player.width / 2;
+    const bossCx = this.x + this.width / 2;
+    const dist = Math.abs(playerCx - bossCx);
+    const playerIsHigh = (player.y + player.height) < (this.baseY + 28);
+
+    let pool;
+    if (this.phase === 2) {
+      if (playerIsHigh) {
+        pool = ['email_storm', 'missile_salvo', 'vulcan_burst', 'mega_beam'];
+      } else if (dist < 220) {
+        pool = ['charge_rush', 'ground_slam', 'email_storm', 'mortar_barrage'];
+      } else {
+        pool = ['mega_beam', 'vulcan_burst', 'mortar_barrage', 'missile_salvo', 'laser_barrage', 'charge_rush'];
+      }
     } else {
-      this.state = 'laser_barrage';
-      this.stateTimer = this.phase === 2 ? 3.0 : 3.8;
+      if (playerIsHigh) {
+        pool = ['email_storm', 'missile_salvo', 'vulcan_burst'];
+      } else if (dist < 210) {
+        pool = ['ground_slam', 'charge_rush', 'mortar_barrage'];
+      } else {
+        pool = ['vulcan_burst', 'mortar_barrage', 'laser_barrage', 'missile_salvo', 'ground_slam'];
+      }
+    }
+
+    const filtered = pool.filter(a => a !== this.lastAttack);
+    const choices = filtered.length > 0 ? filtered : pool;
+    const picked = choices[Math.floor(Math.random() * choices.length)];
+    this.lastAttack = picked;
+    this.startAttackState(picked, player);
+  }
+
+  startAttackState(attackName, player) {
+    this.state = attackName;
+    this.beamActive = false;
+    const playerCx = player.x + player.width / 2;
+    const bossCx = this.x + this.width / 2;
+    this.facing = playerCx < bossCx ? -1 : 1;
+
+    switch (attackName) {
+      case 'vulcan_burst':
+        this.stateTimer = 1.75;
+        this.vulcanShotsLeft = this.phase === 2 ? 12 : 7;
+        this.vulcanTimer = 0.03;
+        this.aimAngle = Math.atan2((player.y + player.height * 0.5) - (this.y + 52), playerCx - bossCx);
+        break;
+      case 'mortar_barrage':
+        this.stateTimer = 1.95;
+        this.mortarShotsLeft = this.phase === 2 ? 6 : 4;
+        this.mortarTimer = 0.04;
+        break;
+      case 'missile_salvo':
+        this.stateTimer = 1.55;
+        this.missileFired = false;
+        break;
+      case 'ground_slam':
+        this.stateTimer = 1.95;
+        this.isSlamming = false;
+        break;
+      case 'email_storm':
+        this.stateTimer = 1.85;
+        this.stormFired = false;
+        break;
+      case 'mega_beam':
+        this.stateTimer = 2.25;
+        this.beamY = this.baseY + 32;
+        break;
+      case 'charge_rush':
+        this.stateTimer = 1.25;
+        this.chargePhase = 'windup';
+        this.chargeDir = this.facing;
+        break;
+      default:
+        this.state = 'laser_barrage';
+        this.stateTimer = this.phase === 2 ? 2.5 : 2.8;
+        this.laserTimer = 0.25;
+        break;
+    }
+  }
+
+  fireVulcanRound(projectiles, soundEngine, particleSystem) {
+    const muzzleX = this.facing === -1 ? this.x + 8 : this.x + this.width - 8;
+    const muzzleY = this.y + 52;
+    const spread = (Math.random() - 0.5) * 0.16;
+    const ang = this.aimAngle + spread;
+    const speed = this.phase === 2 ? 530 : 460;
+
+    projectiles.push({
+      type: 'vulcan',
+      x: muzzleX - 8,
+      y: muzzleY - 4,
+      vx: Math.cos(ang) * speed,
+      vy: Math.sin(ang) * speed,
+      width: 16,
+      height: 8,
+      damage: this.phase === 2 ? 20 : 17,
+      isEnemy: true,
+      life: 3.0
+    });
+    if (soundEngine) soundEngine.playNoise(0.04, null, 0.14);
+    if (particleSystem) {
+      particleSystem.createSparks(muzzleX, muzzleY, '#ffea00', 4);
+    }
+  }
+
+  fireMortarShell(projectiles, player, soundEngine, particleSystem) {
+    const launchX = this.x + this.width / 2;
+    const launchY = this.y + 10;
+    const targetX = player.x + player.width / 2 + (Math.random() - 0.5) * 200;
+    const flightTime = 0.95 + Math.random() * 0.2;
+    const gravity = 720;
+    const vx = (targetX - launchX) / flightTime;
+    const targetY = this.baseY + this.height - 18;
+    const vy = ((targetY - launchY) - 0.5 * gravity * flightTime * flightTime) / flightTime;
+
+    projectiles.push({
+      type: 'boss_mortar',
+      x: launchX - 9,
+      y: launchY,
+      vx,
+      vy,
+      gravity,
+      width: 18,
+      height: 18,
+      damage: this.phase === 2 ? 25 : 22,
+      isEnemy: true,
+      undeflectable: true,
+      life: 2.8
+    });
+    if (soundEngine) soundEngine.playNoise(0.09, null, 0.18);
+    if (particleSystem) {
+      particleSystem.createSmoke(launchX, launchY, 2, '#90a4ae');
+    }
+  }
+
+  fireMissileSalvo(projectiles, player, soundEngine, particleSystem) {
+    const count = this.phase === 2 ? 4 : 3;
+    const launchX = this.x + this.width / 2;
+    const launchY = this.y + 18;
+    for (let i = 0; i < count; i++) {
+      const spreadX = (i - (count - 1) / 2) * 75;
+      projectiles.push({
+        type: 'boss_missile',
+        x: launchX + spreadX * 0.25,
+        y: launchY,
+        vx: this.facing * 195 + spreadX * 0.4,
+        vy: -230 - i * 32,
+        width: 20,
+        height: 12,
+        damage: this.phase === 2 ? 22 : 19,
+        isEnemy: true,
+        homingTime: 2.35,
+        life: 4.2
+      });
+    }
+    if (soundEngine) soundEngine.playNoise(0.14, null, 0.22);
+    if (particleSystem) {
+      particleSystem.createSmoke(launchX, launchY, 4, '#cfd8dc');
     }
   }
 
   fireEmailStorm(projectiles, enemies, soundEngine, particleSystem) {
-    // Dispara leque de emails automáticos + invoca no máximo 1 drone de RH se não houver nenhum ativo
-    const angles = [-0.35, -0.15, 0.05, 0.25];
+    // Dispara leque amplo de emails automáticos na direção do Player + invoca drones de RH
+    const angles = this.phase === 2
+      ? [-0.52, -0.34, -0.16, 0.0, 0.16, 0.34, 0.52]
+      : [-0.42, -0.20, 0.0, 0.20, 0.40];
+    const originX = this.facing === -1 ? this.x + 12 : this.x + this.width - 12;
     for (const ang of angles) {
       projectiles.push({
         type: 'ghosting',
-        x: this.x + 12,
+        x: originX,
         y: this.y + 42,
-        vx: -Math.cos(ang) * 310,
-        vy: Math.sin(ang) * 230,
+        vx: this.facing * Math.cos(ang) * (this.phase === 2 ? 355 : 320),
+        vy: Math.sin(ang) * 260,
         width: 18,
         height: 18,
-        damage: 16,
+        damage: this.phase === 2 ? 20 : 17,
         isEnemy: true,
         life: 3.5
       });
     }
-    if (enemies && enemies.filter(e => !e.isDead && e.type === 'drone').length === 0) {
-      const drone = new Enemy('drone', this.x - 40, this.baseY - 70);
-      drone.hp = 25;
-      drone.maxHp = 25;
+    const maxDrones = this.phase === 2 ? 2 : 1;
+    if (enemies && enemies.filter(e => !e.isDead && e.type === 'drone').length < maxDrones) {
+      const drone = new Enemy('drone', this.x + this.facing * 50, this.baseY - 70);
+      drone.hp = 35;
+      drone.maxHp = 35;
       enemies.push(drone);
     }
     if (soundEngine) soundEngine.playNoise(0.14, null, 0.2);
     if (particleSystem) {
-      particleSystem.createSparks(this.x + 12, this.y + 42, '#00e5ff', 10);
+      particleSystem.createSparks(originX, this.y + 42, '#00e5ff', 10);
     }
   }
 
   fireResumeLaser(projectiles, player, soundEngine) {
-    // Dispara projétil Filtro de Currículo reto em direção ao Player
-    const startY = this.y + 40 + Math.random() * 30;
+    // Dispara projéteis Filtro de Currículo em leque mirando no Player
+    const startX = this.facing === -1 ? this.x - 15 : this.x + this.width;
+    const startY = this.y + 38 + Math.random() * 34;
+    const speed = this.phase === 2 ? 440 : 360;
+    const dy = (player.y + player.height * 0.5) - startY;
+    const aimVy = Math.max(-150, Math.min(150, dy * 0.48));
+
     projectiles.push({
       type: 'laser',
-      x: this.x - 15,
+      x: startX,
       y: startY,
-      vx: -(this.phase === 2 ? 380 : 300),
-      vy: 0,
+      vx: this.facing * speed,
+      vy: aimVy,
+      width: 24,
+      height: 10,
+      damage: this.phase === 2 ? 22 : 19,
+      isEnemy: true,
+      life: 3.5
+    });
+    projectiles.push({
+      type: 'laser',
+      x: startX,
+      y: startY,
+      vx: this.facing * (speed - 30),
+      vy: aimVy - 90,
       width: 24,
       height: 10,
       damage: 18,
       isEnemy: true,
       life: 3.5
     });
-    soundEngine.playNoise(0.05, null, 0.15);
+    if (this.phase === 2) {
+      projectiles.push({
+        type: 'laser',
+        x: startX,
+        y: startY,
+        vx: this.facing * (speed - 30),
+        vy: aimVy + 90,
+        width: 24,
+        height: 10,
+        damage: 18,
+        isEnemy: true,
+        life: 3.5
+      });
+    }
+    if (soundEngine) soundEngine.playNoise(0.05, null, 0.15);
   }
 
   createShockwaves(projectiles) {
@@ -329,15 +678,16 @@ export class Boss {
     if (this.isDead) return 0;
 
     let finalDamage = amount;
-    // Se o núcleo estiver exposto e o jogador estiver com armadura/espada dourada
+    // Blindagem algorítmica reduz dano fora da janela de núcleo exposto
     if (this.isCoreExposed) {
       finalDamage = isPlayerGold ? amount * 2.5 : amount * 1.5;
       if (particleSystem) {
         particleSystem.createDamageNumber(this.x + 40, this.y + 20, 'CRÍTICO!', '#ffd700');
       }
     } else if (this.phase === 2) {
-      // Defesa alta fora da recuperação
-      finalDamage = Math.max(5, amount * 0.45);
+      finalDamage = Math.max(6, amount * 0.35);
+    } else {
+      finalDamage = Math.max(8, amount * 0.75);
     }
 
     this.hp -= finalDamage;
@@ -395,7 +745,7 @@ export class Boss {
     let spriteKey = 'boss_ats_idle';
     if (this.hitTimer > 0) {
       spriteKey = 'boss_ats_attack';
-    } else if (this.state === 'laser_barrage' || this.state === 'email_storm') {
+    } else if (this.state === 'laser_barrage' || this.state === 'email_storm' || this.state === 'vulcan_burst' || this.state === 'mega_beam') {
       spriteKey = 'boss_ats_laser';
     } else if (this.state === 'recovering' || this.isDead) {
       spriteKey = 'boss_ats_stunned';
@@ -406,7 +756,7 @@ export class Boss {
     const screenX = this.x - cameraX + dyingShake;
     const screenY = this.y + (this.isDead ? this.deathSinkY : 0);
 
-    // Telegraph de Ground Slam ou Email Storm
+    // Telegraphs estilo Metal Slug por ataque
     if (!this.isDead && this.state === 'ground_slam' && !this.isSlamming) {
       const pulse = 0.5 + 0.5 * Math.sin(Date.now() * 0.02);
       ctx.save();
@@ -423,6 +773,64 @@ export class Boss {
       ctx.font = 'bold 11px "Press Start 2P", monospace';
       ctx.textAlign = 'center';
       ctx.fillText('! SPAM AUTOMÁTICO !', screenX + this.width / 2, screenY - 16);
+      ctx.restore();
+    } else if (!this.isDead && this.state === 'vulcan_burst' && this.stateTimer > 1.35) {
+      const muzzleX = screenX + (this.facing === -1 ? 8 : this.width - 8);
+      const muzzleY = screenY + 52;
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255, 23, 68, 0.75)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([8, 6]);
+      ctx.beginPath();
+      ctx.moveTo(muzzleX, muzzleY);
+      ctx.lineTo(muzzleX + Math.cos(this.aimAngle) * 520, muzzleY + Math.sin(this.aimAngle) * 520);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#ffea00';
+      ctx.font = 'bold 10px "Press Start 2P", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('! TRAVANDO MIRA !', screenX + this.width / 2, screenY - 16);
+      ctx.restore();
+    } else if (!this.isDead && this.state === 'mortar_barrage' && this.stateTimer > 1.55) {
+      ctx.save();
+      ctx.fillStyle = '#ff9100';
+      ctx.font = 'bold 10px "Press Start 2P", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('! BOMBARDEIO DE TESTES !', screenX + this.width / 2, screenY - 16);
+      ctx.restore();
+    } else if (!this.isDead && this.state === 'missile_salvo' && !this.missileFired) {
+      ctx.save();
+      ctx.fillStyle = '#ff5252';
+      ctx.font = 'bold 10px "Press Start 2P", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('! MÍSSEIS DE REJEIÇÃO !', screenX + this.width / 2, screenY - 16);
+      ctx.restore();
+    } else if (!this.isDead && this.state === 'charge_rush' && this.chargePhase === 'windup') {
+      ctx.save();
+      ctx.fillStyle = '#ffea00';
+      ctx.font = 'bold 10px "Press Start 2P", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('! INVESTIDA TURBO !', screenX + this.width / 2, screenY - 16);
+      ctx.restore();
+    } else if (!this.isDead && this.state === 'mega_beam' && !this.beamActive) {
+      const muzzleX = screenX + (this.facing === -1 ? 8 : this.width - 8);
+      const beamCenterY = this.beamY + 15;
+      const endX = this.facing === -1 ? muzzleX - 780 : muzzleX + 780;
+      const pulse = 0.4 + 0.6 * Math.sin(Date.now() * 0.03);
+      ctx.save();
+      ctx.strokeStyle = `rgba(255, 23, 68, ${pulse.toFixed(2)})`;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(muzzleX, beamCenterY);
+      ctx.lineTo(endX, beamCenterY);
+      ctx.stroke();
+      ctx.fillStyle = '#ffea00';
+      ctx.beginPath();
+      ctx.arc(muzzleX, beamCenterY, 12 + pulse * 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.font = 'bold 10px "Press Start 2P", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('! FIREWALL LASER !', screenX + this.width / 2, screenY - 18);
       ctx.restore();
     }
 
@@ -445,17 +853,41 @@ export class Boss {
         if (Math.floor(Date.now() / 60) % 2 === 0) ctx.filter = 'brightness(2.8) contrast(0.4)';
       } else if (this.hitTimer > 0.07) ctx.filter = 'brightness(3.2) contrast(0.3)';
       else if (this.isCoreExposed) { ctx.shadowColor = '#ffd600'; ctx.shadowBlur = 24; }
-      ctx.drawImage(png, screenX + this.width / 2 - drawW / 2, screenY + this.height - drawH, drawW, drawH);
+      else if (this.phase === 2) { ctx.shadowColor = '#ff1744'; ctx.shadowBlur = 18; }
+      ctx.translate(screenX + this.width / 2, screenY + this.height);
+      if (this.facing === 1) ctx.scale(-1, 1);
+      ctx.drawImage(png, -drawW / 2, -drawH, drawW, drawH);
       ctx.restore();
     } else if (sprite) {
       ctx.save();
       if (this.isDead && Math.floor(Date.now() / 60) % 2 === 0) ctx.filter = 'brightness(2.8) contrast(0.4)';
       else if (this.hitTimer > 0.07) ctx.filter = 'brightness(3.2) contrast(0.3)';
-      ctx.drawImage(sprite, screenX, screenY);
+      ctx.translate(screenX + this.width / 2, screenY);
+      if (this.facing === 1) ctx.scale(-1, 1);
+      ctx.drawImage(sprite, -this.width / 2, 0);
       ctx.restore();
     }
 
     if (this.isDead) return;
+
+    // Feixe ativo do Hyper-Laser estilo Metal Slug
+    if (this.beamActive) {
+      const rect = this.getMegaBeamHitbox();
+      if (rect) {
+        const bx = rect.x - cameraX;
+        const flicker = Math.sin(Date.now() * 0.05) * 4;
+        ctx.save();
+        ctx.fillStyle = 'rgba(255, 23, 68, 0.45)';
+        ctx.fillRect(bx, rect.y - 8 - flicker * 0.4, rect.width, rect.height + 16 + flicker * 0.8);
+        ctx.fillStyle = '#ff5252';
+        ctx.fillRect(bx, rect.y, rect.width, rect.height);
+        ctx.fillStyle = '#ffea00';
+        ctx.fillRect(bx, rect.y + 6, rect.width, rect.height - 12);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(bx, rect.y + 11, rect.width, rect.height - 22);
+        ctx.restore();
+      }
+    }
 
     // Indicador visual de núcleo vulnerável (alvo pulsante + texto)
     if (this.isCoreExposed) {
@@ -471,7 +903,7 @@ export class Boss {
       ctx.textAlign = 'center';
       ctx.fillText('NÚCLEO EXPOSTO! ATAQUE!', screenX + this.width / 2, screenY - 14);
       ctx.restore();
-    } else if (this.state === 'laser_barrage') {
+    } else if (this.state === 'laser_barrage' || this.state === 'vulcan_burst') {
       ctx.save();
       ctx.fillStyle = '#ff8a80';
       ctx.font = 'bold 10px monospace';
@@ -498,10 +930,13 @@ export class Boss {
     ctx.strokeRect(barX - 4, barY - 18, barW + 8, barH + 26);
 
     // Título do Boss
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = this.phase === 2 ? '#ff8a80' : '#ffffff';
     ctx.font = 'bold 11px monospace';
     ctx.textAlign = 'center';
-    ctx.fillText('ATS-9000: O GUARDIÃO ALGORÍTMICO DO RH', screenWidth / 2, barY - 5);
+    const title = this.phase === 2
+      ? 'ATS-9000 [MODO OVERCLOCK]: GUARDIÃO DO RH'
+      : 'ATS-9000: O GUARDIÃO ALGORÍTMICO DO RH';
+    ctx.fillText(title, screenWidth / 2, barY - 5);
 
     // Barra de Vida
     const hpPct = Math.max(0, this.hp / this.maxHp);

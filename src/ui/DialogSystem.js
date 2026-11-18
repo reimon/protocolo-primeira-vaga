@@ -24,25 +24,60 @@ export class DialogSystem {
 
   open(mentor) {
     this.activeMentorInstance = mentor;
+    const data = mentor && mentor.data ? mentor.data : mentor;
     this.activeDialog = {
-      lines: mentor.data.lines,
+      lines: data.lines,
       currentLineIndex: 0,
       displayedChars: 0,
       charTimer: 0,
-      choices: mentor.data.choices || null,
+      choices: data.choices || null,
       selectedChoice: 0,
-      grantDoubleJump: mentor.data.grantDoubleJump || false
+      grantDoubleJump: data.grantDoubleJump || false,
+      onFinish: typeof data.onFinish === 'function' ? data.onFinish : null
     };
-    this.sound.playMentorTeleport();
+    if (data.openSound === 'alert') {
+      this.sound.playHit();
+    } else {
+      this.sound.playMentorTeleport();
+    }
 
     const touchEl = document.getElementById('touchControls');
     if (touchEl) touchEl.classList.add('hidden');
   }
 
+  getLineText(line) {
+    return typeof line === 'string' ? line : (line?.text || '');
+  }
+
+  getLineSpeaker(line) {
+    return typeof line === 'string' ? 'MESTRE DOS MAGOS DA CARREIRA' : (line?.speaker || 'MESTRE DOS MAGOS DA CARREIRA');
+  }
+
+  getLineColor(line) {
+    return typeof line === 'string' ? '#ffd700' : (line?.color || '#ffd700');
+  }
+
+  wrapText(text, maxChars = 66) {
+    const words = text.split(' ');
+    const lines = [];
+    let current = '';
+    for (const w of words) {
+      const candidate = current ? `${current} ${w}` : w;
+      if (candidate.length <= maxChars) {
+        current = candidate;
+      } else {
+        if (current) lines.push(current);
+        current = w;
+      }
+    }
+    if (current) lines.push(current);
+    return lines;
+  }
+
   update(dt, input) {
     if (!this.activeDialog) return;
 
-    const currentLine = this.activeDialog.lines[this.activeDialog.currentLineIndex];
+    const currentLine = this.getLineText(this.activeDialog.lines[this.activeDialog.currentLineIndex]);
     if (this.activeDialog.displayedChars < currentLine.length) {
       this.activeDialog.charTimer += dt;
       if (this.activeDialog.charTimer >= this.typewriterDelay) {
@@ -70,7 +105,7 @@ export class DialogSystem {
   advance({ player, stats, particles, touchEnabled }) {
     if (!this.activeDialog) return false;
 
-    const currentLine = this.activeDialog.lines[this.activeDialog.currentLineIndex];
+    const currentLine = this.getLineText(this.activeDialog.lines[this.activeDialog.currentLineIndex]);
 
     if (this.activeDialog.displayedChars < currentLine.length) {
       this.activeDialog.displayedChars = currentLine.length;
@@ -108,8 +143,13 @@ export class DialogSystem {
       this.activeMentorInstance.vanish(particles, this.sound);
     }
 
+    const onFinish = this.activeDialog.onFinish;
     this.activeDialog = null;
     this.activeMentorInstance = null;
+
+    if (onFinish) {
+      onFinish({ player, stats, particles });
+    }
 
     if (touchEnabled) {
       const touchEl = document.getElementById('touchControls');
@@ -124,8 +164,13 @@ export class DialogSystem {
     this.activeMentorInstance = null;
   }
 
-  render(ctx, renderer, width, height) {
+  render(ctx, renderer, width, height, playerGender = 'male') {
     if (!this.activeDialog) return;
+
+    const rawLine = this.activeDialog.lines[this.activeDialog.currentLineIndex];
+    const speaker = this.getLineSpeaker(rawLine);
+    const accentColor = this.getLineColor(rawLine);
+    const portraitType = typeof rawLine === 'object' && rawLine ? rawLine.portrait : 'mentor';
 
     const boxW = Math.min(1060, width - 120);
     const boxX = (width - boxW) / 2;
@@ -134,36 +179,57 @@ export class DialogSystem {
 
     ctx.fillStyle = 'rgba(8, 10, 22, 0.96)';
     ctx.fillRect(boxX, boxY, boxW, boxH);
-    ctx.strokeStyle = '#ffd700';
+    ctx.strokeStyle = accentColor;
     ctx.lineWidth = 3;
     ctx.strokeRect(boxX, boxY, boxW, boxH);
 
-    const portrait = renderer.ext('mentor_portrait') || renderer.get('portrait_mentor');
-    if (portrait) {
-      ctx.drawImage(portrait, boxX + 16, boxY + 20, 76, 76);
-      ctx.strokeStyle = '#ffd700';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(boxX + 16, boxY + 20, 76, 76);
-    }
+    // Retrato do interlocutor (Mentor, Chefe Louca ou Herói/Heroína)
+    const pX = boxX + 16;
+    const pY = boxY + 20;
+    const pSize = 76;
+    ctx.fillStyle = 'rgba(18, 24, 42, 0.95)';
+    ctx.fillRect(pX, pY, pSize, pSize);
 
-    ctx.fillStyle = '#ffd700';
+    if (portraitType === 'chefe_louca') {
+      const sheet = renderer.ext && renderer.ext('enemy_blonde_glasses');
+      if (sheet) {
+        ctx.drawImage(sheet, 16, 0, 88, 88, pX, pY, pSize, pSize);
+      }
+    } else if (portraitType === 'hero') {
+      const sheetKey = playerGender === 'female' ? 'hero_female' : 'hero';
+      const sheet = renderer.ext && renderer.ext(sheetKey);
+      if (sheet) {
+        const fw = sheet.width / 4;
+        ctx.drawImage(sheet, fw + 118, 6, 170, 170, pX, pY, pSize, pSize);
+      } else {
+        const fallback = renderer.get('player_base_idle');
+        if (fallback) ctx.drawImage(fallback, pX, pY, pSize, pSize);
+      }
+    } else {
+      const portrait = (renderer.ext && renderer.ext('mentor_portrait')) || renderer.get('portrait_mentor');
+      if (portrait) {
+        ctx.drawImage(portrait, pX, pY, pSize, pSize);
+      }
+    }
+    ctx.strokeStyle = accentColor;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(pX, pY, pSize, pSize);
+
+    ctx.fillStyle = accentColor;
     ctx.font = 'bold 15px monospace';
     ctx.textAlign = 'left';
-    ctx.fillText('MESTRE DOS MAGOS DA CARREIRA', boxX + 108, boxY + 36);
+    ctx.fillText(speaker, boxX + 108, boxY + 36);
 
-    const currentLine = this.activeDialog.lines[this.activeDialog.currentLineIndex];
+    const currentLine = this.getLineText(rawLine);
     const textToShow = currentLine.slice(0, this.activeDialog.displayedChars);
 
     ctx.fillStyle = '#ffffff';
     ctx.font = '14px monospace';
 
-    const maxCharsPerLine = 58;
-    if (textToShow.length > maxCharsPerLine) {
-      ctx.fillText(textToShow.slice(0, maxCharsPerLine), boxX + 108, boxY + 68);
-      ctx.fillText(textToShow.slice(maxCharsPerLine), boxX + 108, boxY + 92);
-    } else {
-      ctx.fillText(textToShow, boxX + 108, boxY + 68);
-    }
+    const wrapped = this.wrapText(textToShow, 66);
+    wrapped.slice(0, 3).forEach((ln, idx) => {
+      ctx.fillText(ln, boxX + 108, boxY + 66 + idx * 23);
+    });
 
     if (this.activeDialog.choices && this.activeDialog.displayedChars >= currentLine.length) {
       this.activeDialog.choices.forEach((choice, idx) => {

@@ -56,21 +56,21 @@ export class PixelRenderer {
       mentorBeardShine: '#ffffff',
       mentorOrb: '#00ffff',
 
-      // Inimigos Hi-Bit
-      bugDark: '#0e4a1a',
-      bugBase: '#1b8a34',
-      bugLight: '#00e676',
+      // Inimigos Hi-Bit (Temáticos: Jornada Tech & Mercado Corporativo)
+      bugDark: '#1b2631',
+      bugBase: '#2c3e50',
+      bugLight: '#546e7a',
       bugLaser: '#ff1744',
 
-      ghostDark: '#38006b',
-      ghostBase: '#7b1fa2',
+      ghostDark: '#1a0e2e',
+      ghostBase: '#4a148c',
       ghostLight: '#ba68c8',
-      ghostCyan: '#18ffff',
+      ghostCyan: '#00e5ff',
 
-      golemDark: '#263238',
-      golemBase: '#455a64',
-      golemLight: '#78909c',
-      golemRune: '#ff9800',
+      golemDark: '#141c2b',
+      golemBase: '#223047',
+      golemLight: '#3b4f6e',
+      golemRune: '#d50000',
 
       // Boss ATS-9000
       mechDark: '#171a1d',
@@ -99,6 +99,8 @@ export class PixelRenderer {
       { key: 'bg_npc_woman', path: 'assets/sprites/bg_npc_woman_frames.png' },
       { key: 'bg_npc_commuter', path: 'assets/sprites/bg_npc_commuter_frames.png' },
       { key: 'bg_npc_exec', path: 'assets/sprites/bg_npc_exec_frames.png' },
+      { key: 'enemy_blonde_glasses', path: 'assets/sprites/enemy_blonde_glasses_frames.png' },
+      { key: 'enemy_blonde_tongue', path: 'assets/sprites/enemy_blonde_tongue_frames.png' },
       { key: 'crate_supply', path: 'assets/sprites/crate_supply.png' },
       { key: 'pow_cage', path: 'assets/sprites/pow_cage.png' }
     ];
@@ -511,9 +513,9 @@ export class PixelRenderer {
   generateHiBitEnemies() {
     const P = this.palette;
 
-    // 1. Bug Rastejante (36x36) - 4 frames de marcha + lunge + hit
+    // 1. Bug de Produção (38x36) - Terminal/Monitor CRT Corrompido sobre Pernas de Cabo
     ['walk1', 'walk2', 'walk3', 'walk4', 'lunge', 'hit'].forEach((s, idx) => {
-      const { canvas, ctx } = this.createCanvas(36, 36);
+      const { canvas, ctx } = this.createCanvas(38, 36);
       const isHit = s === 'hit';
       const isLunge = s === 'lunge';
       const phase = idx % 4;
@@ -521,111 +523,118 @@ export class PixelRenderer {
       const legWave = [2, 0, -2, 0][phase];
       const legWave2 = [-2, 0, 2, 0][phase];
 
-      // Antenas articuladas
+      // Antena de debug / WiFi soltando faísca
       ctx.fillStyle = P.outline;
-      ctx.fillRect(6, 6 + bodyBob + (phase % 2), 2, 5);
-      ctx.fillRect(10, 5 + bodyBob + ((phase + 1) % 2), 2, 6);
-      ctx.fillStyle = isLunge ? '#ffea00' : P.bugLaser;
-      ctx.fillRect(5, 5 + bodyBob + (phase % 2), 3, 2);
-      ctx.fillRect(9, 4 + bodyBob + ((phase + 1) % 2), 3, 2);
+      ctx.fillRect(17, 2 + bodyBob, 4, 6);
+      ctx.fillStyle = isLunge || phase % 2 === 0 ? '#ffea00' : '#ff1744';
+      ctx.fillRect(16, 1 + bodyBob, 6, 3);
 
-      // Contorno Preto
+      // Carcaça do Monitor/Terminal CRT
       ctx.fillStyle = P.outline;
-      ctx.fillRect(6, 10 + bodyBob, 24, 16);
+      ctx.fillRect(5, 7 + bodyBob, 28, 20);
+      ctx.fillStyle = isHit ? '#ffffff' : P.bugDark;
+      ctx.fillRect(6, 8 + bodyBob, 26, 18);
+      ctx.fillStyle = isHit ? '#ffffff' : P.bugBase;
+      ctx.fillRect(7, 9 + bodyBob, 24, 14);
+      ctx.fillStyle = isHit ? '#ffffff' : P.bugLight;
+      ctx.fillRect(8, 9 + bodyBob, 22, 3);
 
-      // Carapaça Verde Metálica com 4 tons
-      ctx.fillStyle = isHit ? '#ffffff' : (isLunge ? '#c62828' : P.bugDark);
-      ctx.fillRect(7, 11 + bodyBob, 22, 14);
-      ctx.fillStyle = isHit ? '#ffffff' : (isLunge ? '#ff5252' : P.bugBase);
-      ctx.fillRect(7, 11 + bodyBob, 21, 11);
-      ctx.fillStyle = isHit ? '#ffffff' : (isLunge ? '#ff8a80' : P.bugLight);
-      ctx.fillRect(8, 12 + bodyBob, 18, 4);
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(10 + (phase % 2), 13 + bodyBob, 7, 2);
+      // Tela CRT vermelha de Erro Fatal / BSOD
+      ctx.fillStyle = isHit ? '#ffffff' : (isLunge ? '#ff1744' : '#880e1f');
+      ctx.fillRect(8, 11 + bodyBob, 18, 11);
 
-      // Segmentos da carapaça
       if (!isHit) {
-        ctx.fillStyle = P.outlineSoft;
-        ctx.fillRect(15, 12 + bodyBob, 2, 12);
-        ctx.fillRect(22, 12 + bodyBob, 2, 12);
+        // Olhos de erro glitch `> <` e scanline na tela
+        ctx.fillStyle = isLunge ? '#ffea00' : '#ff5252';
+        ctx.fillRect(8, 13 + ((phase * 2) % 6) + bodyBob, 18, 2);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(10, 14 + bodyBob, 3, 2);
+        ctx.fillRect(12, 16 + bodyBob, 2, 2);
+        ctx.fillRect(20, 14 + bodyBob, 3, 2);
+        ctx.fillRect(19, 16 + bodyBob, 2, 2);
+        // LED de alerta lateral
+        ctx.fillStyle = phase % 2 === 0 ? '#ff1744' : '#ffea00';
+        ctx.fillRect(28, 12 + bodyBob, 2, 2);
+        ctx.fillStyle = '#00e5ff';
+        ctx.fillRect(28, 17 + bodyBob, 2, 2);
       }
 
-      // Scanner Laser / Mandíbulas
-      ctx.fillStyle = isLunge ? '#ffea00' : P.bugLaser;
-      ctx.fillRect(3, 14 + bodyBob, 6, 5);
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(4, 15 + bodyBob, 2, 2);
-
-      // 3 pares de patas articuladas em onda
-      ctx.fillStyle = '#1c2833';
-      ctx.fillRect(7 + legWave, 24 + bodyBob, 4, 7);
-      ctx.fillRect(16 + legWave2, 24 + bodyBob, 4, 7);
-      ctx.fillRect(25 + legWave, 24 + bodyBob, 4, 7);
-      ctx.fillStyle = P.bugLight;
-      ctx.fillRect(8 + legWave, 25 + bodyBob, 2, 3);
-      ctx.fillRect(17 + legWave2, 25 + bodyBob, 2, 3);
-      ctx.fillRect(26 + legWave, 25 + bodyBob, 2, 3);
+      // Pernas mecânicas de cabo de rede articuladas
+      ctx.fillStyle = P.outline;
+      ctx.fillRect(7 + legWave, 26 + bodyBob, 5, 8);
+      ctx.fillRect(16 + legWave2, 26 + bodyBob, 5, 8);
+      ctx.fillRect(25 + legWave, 26 + bodyBob, 5, 8);
+      ctx.fillStyle = isHit ? '#ffffff' : '#00e5ff';
+      ctx.fillRect(8 + legWave, 27 + bodyBob, 3, 4);
+      ctx.fillRect(17 + legWave2, 27 + bodyBob, 3, 4);
+      ctx.fillRect(26 + legWave, 27 + bodyBob, 3, 4);
+      ctx.fillStyle = '#ff1744';
+      ctx.fillRect(8 + legWave, 31 + bodyBob, 3, 2);
+      ctx.fillRect(26 + legWave, 31 + bodyBob, 3, 2);
 
       this.set(`enemy_bug_${s}`, canvas);
     });
 
-    // 2. Fantasma da Síndrome do Impostor (36x36) - 4 frames de flutuação + hit
+    // 2. Holograma Glitch da Síndrome do Impostor (38x42) - Silhueta Digital Corrompida
     ['float1', 'float2', 'float3', 'float4', 'hit'].forEach((s, idx) => {
-      const { canvas, ctx } = this.createCanvas(36, 36);
+      const { canvas, ctx } = this.createCanvas(38, 42);
       const isHit = s === 'hit';
       const phase = idx % 4;
       const bob = [0, 1, 2, 1][phase];
-      const t1 = [0, 2, 0, -2][phase];
-      const t2 = [-2, 0, 2, 0][phase];
+      const glitchShift = [0, 2, -2, 1][phase];
 
-      // Ectoplasma ondulante com contorno suave
-      ctx.fillStyle = isHit ? '#ffffff' : P.ghostDark;
-      ctx.beginPath();
-      ctx.arc(18, 14 + bob, 13, Math.PI, 0);
-      ctx.lineTo(31, 29 + bob + t1);
-      ctx.lineTo(24, 24 + bob);
-      ctx.lineTo(18, 30 + bob + t2);
-      ctx.lineTo(12, 24 + bob);
-      ctx.lineTo(5, 29 + bob + t1);
-      ctx.closePath();
-      ctx.fill();
-
-      ctx.fillStyle = isHit ? '#ffffff' : P.ghostBase;
-      ctx.beginPath();
-      ctx.arc(18, 14 + bob, 11, Math.PI, 0);
-      ctx.lineTo(29, 27 + bob + t1);
-      ctx.lineTo(24, 23 + bob);
-      ctx.lineTo(18, 28 + bob + t2);
-      ctx.lineTo(12, 23 + bob);
-      ctx.lineTo(7, 27 + bob + t1);
-      ctx.closePath();
-      ctx.fill();
-
-      // Luz de destaque no topo
+      // Aura de interferência magenta/ciano
       if (!isHit) {
-        ctx.fillStyle = P.ghostLight;
-        ctx.fillRect(12, 5 + bob, 8, 3);
+        ctx.fillStyle = 'rgba(0, 229, 255, 0.25)';
+        ctx.fillRect(6 - glitchShift, 8 + bob, 26, 26);
+        ctx.fillStyle = 'rgba(255, 42, 133, 0.28)';
+        ctx.fillRect(8 + glitchShift, 10 + bob, 24, 24);
       }
 
-      // Olhos Ocos com Brilho Ciano pulsante
-      ctx.fillStyle = P.ghostCyan;
-      ctx.fillRect(11, 12 + bob, 4, 5);
-      ctx.fillRect(21, 12 + bob, 4, 5);
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(12 + (phase % 2), 13 + bob, 2, 2);
-      ctx.fillRect(22 + (phase % 2), 13 + bob, 2, 2);
+      // Capuz & silhueta holográfica do Dev corrompido
+      ctx.fillStyle = isHit ? '#ffffff' : P.ghostDark;
+      ctx.fillRect(9, 4 + bob, 20, 16);
+      ctx.fillRect(7, 16 + bob, 24, 15);
+      // Base fragmentada em dados caindo
+      ctx.fillRect(8, 31 + bob, 5, 4 + (phase % 2) * 2);
+      ctx.fillRect(16, 31 + bob, 6, 5 - (phase % 2));
+      ctx.fillRect(25, 31 + bob, 5, 3 + ((phase + 1) % 2) * 2);
 
-      // Partícula ectoplásmica lateral
+      ctx.fillStyle = isHit ? '#ffffff' : P.ghostBase;
+      ctx.fillRect(11, 6 + bob, 16, 13);
+      ctx.fillRect(9, 17 + bob, 20, 13);
+
       if (!isHit) {
+        // Linhas horizontais de scanline / glitch
         ctx.fillStyle = P.ghostCyan;
-        ctx.fillRect(3 + phase, 20 - phase, 2, 2);
-        ctx.fillRect(31 - phase, 16 + phase, 2, 2);
+        ctx.fillRect(8 + glitchShift, 10 + bob + phase * 2, 22, 1);
+        ctx.fillRect(7 - glitchShift, 22 + bob, 24, 2);
+        ctx.fillStyle = '#ff2a85';
+        ctx.fillRect(10 + glitchShift, 26 + bob, 18, 1);
+
+        // Visor vazio com olhos digitais brilhantes + símbolo `[?]`
+        ctx.fillStyle = '#090b16';
+        ctx.fillRect(12, 10 + bob, 14, 7);
+        ctx.fillStyle = P.ghostCyan;
+        ctx.fillRect(14, 12 + bob, 3, 3);
+        ctx.fillRect(21, 12 + bob, 3, 3);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(15, 12 + bob, 1, 2);
+        ctx.fillRect(22, 12 + bob, 1, 2);
+
+        // Partículas `[404]` orbitando
+        ctx.fillStyle = '#ff2a85';
+        ctx.fillRect(3 + phase, 14 - phase, 3, 2);
+        ctx.fillRect(32 - phase, 20 + phase, 3, 2);
+        ctx.fillStyle = P.ghostCyan;
+        ctx.fillRect(5, 29 + (phase % 2), 2, 3);
+        ctx.fillRect(31, 9 + (phase % 3), 2, 3);
       }
 
       this.set(`enemy_ghost_${s}`, canvas);
     });
 
-    // 3. Golem do "Pede-se 5 Anos de Experiência" (56x56) - stand, 4 walk, 4 noshield, hit
+    // 3. Porteiro Corporativo "Vaga Jr: 5 Anos Exp" (56x56) - Executivo Blindado de Terno + Barreira 5+
     const golemStates = ['stand', 'walk1', 'walk2', 'walk3', 'walk4', 'noshield1', 'noshield2', 'noshield3', 'noshield4', 'hit'];
     golemStates.forEach((s, idx) => {
       const { canvas, ctx } = this.createCanvas(56, 56);
@@ -636,54 +645,79 @@ export class PixelRenderer {
       const legL = [0, -2, 0, 2][phase];
       const legR = [0, 2, 0, -2][phase];
 
-      // Pernas / Botas de pedra articuladas
+      // Sapatos sociais pesados & calça de terno
       ctx.fillStyle = P.outline;
-      ctx.fillRect(10, 42 + legL, 10, 10);
-      ctx.fillRect(24, 42 + legR, 10, 10);
+      ctx.fillRect(10, 41 + legL, 10, 11);
+      ctx.fillRect(23, 41 + legR, 10, 11);
       ctx.fillStyle = isHit ? '#ffffff' : P.golemDark;
-      ctx.fillRect(11, 43 + legL, 8, 8);
-      ctx.fillRect(25, 43 + legR, 8, 8);
+      ctx.fillRect(11, 42 + legL, 8, 6);
+      ctx.fillRect(24, 42 + legR, 8, 6);
+      ctx.fillStyle = isHit ? '#ffffff' : '#111111';
+      ctx.fillRect(11, 48 + legL, 9, 3);
+      ctx.fillRect(24, 48 + legR, 9, 3);
 
-      // Corpo Maciço de Pedra com Contorno
+      // Tronco musculoso de terno executivo azul-marinho
       ctx.fillStyle = P.outline;
-      ctx.fillRect(8, 8 + bob, 28, 36);
+      ctx.fillRect(7, 14 + bob, 28, 28);
       ctx.fillStyle = isHit ? '#ffffff' : P.golemBase;
-      ctx.fillRect(9, 9 + bob, 26, 34);
+      ctx.fillRect(8, 15 + bob, 26, 26);
       ctx.fillStyle = isHit ? '#ffffff' : P.golemLight;
-      ctx.fillRect(10, 10 + bob, 10, 30);
+      ctx.fillRect(9, 16 + bob, 9, 24);
 
-      // Núcleo rúnico rachado (visível principalmente quando sem escudo)
-      if (!hasShield && !isHit) {
-        ctx.fillStyle = '#ff6d00';
-        ctx.fillRect(18, 22 + bob, 10, 10);
-        ctx.fillStyle = '#ffea00';
-        ctx.fillRect(20, 24 + bob, 6, 6);
+      // Camisa branca e Gravata Vermelha Corporativa
+      if (!isHit) {
+        ctx.fillStyle = '#eceff1';
+        ctx.fillRect(17, 16 + bob, 8, 14);
+        ctx.fillStyle = P.golemRune;
+        ctx.fillRect(19, 17 + bob, 4, 15);
+        ctx.fillStyle = '#ff5252';
+        ctx.fillRect(20, 18 + bob, 2, 10);
       }
 
-      // Visor Vermelho Feroz
-      ctx.fillStyle = '#ff1744';
-      ctx.fillRect(14, 14 + bob, 14, 4);
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(15 + (phase % 2), 15 + bob, 3, 2);
+      // Cabeça + Cabelo executivo + Óculos Scanner Vermelho
+      ctx.fillStyle = P.outline;
+      ctx.fillRect(12, 3 + bob, 18, 13);
+      ctx.fillStyle = isHit ? '#ffffff' : P.skinBase;
+      ctx.fillRect(13, 6 + bob, 16, 9);
+      ctx.fillStyle = isHit ? '#ffffff' : '#1c2833';
+      ctx.fillRect(13, 4 + bob, 16, 4);
+      if (!isHit) {
+        // Visor corporativo vermelho estilo agente/segurança
+        ctx.fillStyle = '#141013';
+        ctx.fillRect(14, 8 + bob, 15, 4);
+        ctx.fillStyle = hasShield ? '#ff1744' : '#ffea00';
+        ctx.fillRect(15 + (phase % 2), 9 + bob, 12, 2);
+      }
+
+      // Braço traseiro
+      ctx.fillStyle = P.outline;
+      ctx.fillRect(5, 17 + bob, 5, 16);
+      ctx.fillStyle = isHit ? '#ffffff' : P.golemDark;
+      ctx.fillRect(6, 18 + bob, 3, 14);
 
       if (hasShield) {
-        // O ENORME ESCUDO FRONTAL DOURADO "5+ YRS"
+        // O ENORME ESCUDO/PRANCHETA BLINDADA "5+ ANOS EXP"
         const shX = 32;
-        const shY = 4 + bob;
+        const shY = 5 + bob;
         ctx.fillStyle = P.outline;
-        ctx.fillRect(shX, shY, 18, 44);
+        ctx.fillRect(shX, shY, 18, 43);
         ctx.fillStyle = '#f39c12';
-        ctx.fillRect(shX + 1, shY + 1, 16, 42);
+        ctx.fillRect(shX + 1, shY + 1, 16, 41);
         ctx.fillStyle = '#f1c40f';
-        ctx.fillRect(shX + 2, shY + 2, 12, 40);
+        ctx.fillRect(shX + 2, shY + 2, 12, 39);
+        // Clipe metálico de prancheta no topo
+        ctx.fillStyle = '#cfd8dc';
+        ctx.fillRect(shX + 5, shY - 1, 8, 4);
 
+        // Rebites
         ctx.fillStyle = '#37474f';
-        ctx.fillRect(shX + 3, shY + 3, 3, 3);
-        ctx.fillRect(shX + 12, shY + 3, 3, 3);
-        ctx.fillRect(shX + 3, shY + 38, 3, 3);
-        ctx.fillRect(shX + 12, shY + 38, 3, 3);
+        ctx.fillRect(shX + 3, shY + 4, 3, 3);
+        ctx.fillRect(shX + 12, shY + 4, 3, 3);
+        ctx.fillRect(shX + 3, shY + 37, 3, 3);
+        ctx.fillRect(shX + 12, shY + 37, 3, 3);
 
-        ctx.fillStyle = '#000000';
+        // Texto pixelado "5+"
+        ctx.fillStyle = '#141013';
         ctx.fillRect(shX + 5, shY + 14, 6, 2);
         ctx.fillRect(shX + 5, shY + 16, 2, 4);
         ctx.fillRect(shX + 5, shY + 20, 6, 2);
@@ -697,45 +731,329 @@ export class PixelRenderer {
       this.set(`enemy_golem_${s}`, canvas);
     });
 
-    // 4. Drone de Ghosting (36x36) - 4 frames de rotor + charge + hit
+    // 4. Bot de Ghosting do RH (40x40) - Drone Executor ATS-Mini
     ['fly1', 'fly2', 'fly3', 'fly4', 'charge', 'hit'].forEach((s, idx) => {
-      const { canvas, ctx } = this.createCanvas(36, 36);
+      const { canvas, ctx } = this.createCanvas(40, 40);
       const isHit = s === 'hit';
       const isCharge = s === 'charge';
       const phase = idx % 4;
-      const rotorW = [28, 16, 8, 18][phase];
-      const rotorX = 18 - Math.floor(rotorW / 2);
+      const rotorW = [30, 18, 10, 20][phase];
+      const rotorX = 20 - Math.floor(rotorW / 2);
       const bob = [0, 1, 0, -1][phase];
 
-      // Hélices com 4 fases de rotação
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+      // Rotor duplo estilo ATS
+      ctx.fillStyle = 'rgba(0, 229, 255, 0.85)';
       ctx.fillRect(rotorX, 4 + bob, rotorW, 2);
       ctx.fillStyle = '#90a4ae';
-      ctx.fillRect(16, 6 + bob, 4, 3);
+      ctx.fillRect(18, 6 + bob, 4, 3);
 
-      // Chassi do Drone
+      // Chassi Blindado estilo ATS-9000
       ctx.fillStyle = P.outline;
-      ctx.fillRect(8, 8 + bob, 20, 18);
-      ctx.fillStyle = isHit ? '#ffffff' : '#37474f';
-      ctx.fillRect(9, 9 + bob, 18, 16);
-      ctx.fillStyle = isHit ? '#ffffff' : '#546e7a';
-      ctx.fillRect(10, 10 + bob, 16, 3);
+      ctx.fillRect(8, 9 + bob, 24, 20);
+      ctx.fillStyle = isHit ? '#ffffff' : P.mechBase;
+      ctx.fillRect(9, 10 + bob, 22, 18);
+      ctx.fillStyle = isHit ? '#ffffff' : P.mechLight;
+      ctx.fillRect(10, 10 + bob, 20, 4);
 
-      // Tela com Ícone de E-mail Sem Resposta
-      ctx.fillStyle = isCharge ? '#ffebee' : '#ffffff';
-      ctx.fillRect(11, 12 + bob, 14, 10);
-      ctx.fillStyle = isCharge ? '#ff1744' : '#e53935';
-      ctx.fillRect(13, 13 + bob, 3, 3);
-      ctx.fillRect(19, 13 + bob, 3, 3);
-      ctx.fillRect(16, 16 + bob, 3, 3);
+      // Olho ciclope scanner ATS + Envelope de Rejeição Automática
+      ctx.fillStyle = '#141013';
+      ctx.fillRect(12, 14 + bob, 16, 10);
+      ctx.fillStyle = isCharge ? '#ffea00' : '#ff1744';
+      ctx.fillRect(14, 15 + bob, 12, 3);
+      if (!isHit) {
+        ctx.fillStyle = '#eceff1';
+        ctx.fillRect(14, 19 + bob, 12, 5);
+        ctx.fillStyle = '#ff1744';
+        ctx.fillRect(16, 20 + bob, 2, 2);
+        ctx.fillRect(22, 20 + bob, 2, 2);
+        ctx.fillRect(19, 21 + bob, 2, 2);
+      }
 
-      // Canhão inferior brilhando quando carregando tiro
+      // Propulsor inferior
       ctx.fillStyle = P.outline;
-      ctx.fillRect(15, 26 + bob, 6, 5);
+      ctx.fillRect(16, 29 + bob, 8, 5);
       ctx.fillStyle = isCharge ? '#ffea00' : '#00e5ff';
-      ctx.fillRect(16, 27 + bob, 4, 3);
+      ctx.fillRect(18, 30 + bob, 4, 3);
 
       this.set(`enemy_drone_${s}`, canvas);
+    });
+
+    // 5. Bot de Scroll Infinito / Procrastinação (36x44) - Smartphone Reels Ambulante
+    ['walk1', 'walk2', 'walk3', 'walk4', 'charge', 'hit'].forEach((s, idx) => {
+      const { canvas, ctx } = this.createCanvas(36, 44);
+      const isHit = s === 'hit';
+      const isCharge = s === 'charge';
+      const phase = idx % 4;
+      const bob = isCharge ? 2 : [0, -1, 0, 1][phase];
+      const legL = [0, -3, 0, 3][phase];
+      const legR = [0, 3, 0, -3][phase];
+
+      // Tênis / pernas correndo
+      ctx.fillStyle = P.outline;
+      ctx.fillRect(9, 34 + legL, 7, 8);
+      ctx.fillRect(20, 34 + legR, 7, 8);
+      ctx.fillStyle = isHit ? '#ffffff' : '#ff2a85';
+      ctx.fillRect(10, 37 + legL, 6, 4);
+      ctx.fillRect(21, 37 + legR, 6, 4);
+
+      // Corpo Smartphone Vertical
+      ctx.fillStyle = P.outline;
+      ctx.fillRect(6, 3 + bob, 24, 32);
+      ctx.fillStyle = isHit ? '#ffffff' : '#1e272e';
+      ctx.fillRect(7, 4 + bob, 22, 30);
+
+      // Tela Neon de Feed Infinito
+      ctx.fillStyle = isHit ? '#ffffff' : (isCharge ? '#ff2a85' : '#4a148c');
+      ctx.fillRect(9, 7 + bob, 18, 24);
+      if (!isHit) {
+        // Barras de feed rolando
+        const scrollOff = (phase * 4) % 12;
+        ctx.fillStyle = '#00e5ff';
+        ctx.fillRect(11, 9 + bob + scrollOff, 14, 3);
+        ctx.fillStyle = '#ff80ab';
+        ctx.fillRect(11, 22 + bob - Math.floor(scrollOff / 2), 10, 2);
+
+        // Botão PLAY central brilhante
+        ctx.fillStyle = isCharge ? '#ffea00' : '#ffffff';
+        ctx.fillRect(14, 14 + bob, 2, 9);
+        ctx.fillRect(16, 15 + bob, 2, 7);
+        ctx.fillRect(18, 16 + bob, 2, 5);
+        ctx.fillRect(20, 17 + bob, 2, 3);
+
+        // Badge vermelho de notificação (99+)
+        ctx.fillStyle = '#ff1744';
+        ctx.fillRect(22, 4 + bob, 6, 5);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(24, 5 + bob, 2, 3);
+      }
+
+      this.set(`enemy_procrastination_${s}`, canvas);
+    });
+
+    // 6. Avaliador de Live Coding / Quadro Branco (42x48) - Entrevistador Técnico
+    ['walk1', 'walk2', 'walk3', 'walk4', 'throw', 'hit'].forEach((s, idx) => {
+      const { canvas, ctx } = this.createCanvas(42, 48);
+      const isHit = s === 'hit';
+      const isThrow = s === 'throw';
+      const phase = idx % 4;
+      const bob = [0, -1, 0, 1][phase];
+      const legL = [0, -2, 0, 2][phase];
+      const legR = [0, 2, 0, -2][phase];
+
+      // Pernas sociais
+      ctx.fillStyle = P.outline;
+      ctx.fillRect(13, 34 + legL, 6, 12);
+      ctx.fillRect(22, 34 + legR, 6, 12);
+      ctx.fillStyle = isHit ? '#ffffff' : '#1c2833';
+      ctx.fillRect(14, 35 + legL, 4, 10);
+      ctx.fillRect(23, 35 + legR, 4, 10);
+
+      // Blazer corporativo cinza + camisa social ciano
+      ctx.fillStyle = P.outline;
+      ctx.fillRect(11, 16 + bob, 20, 19);
+      ctx.fillStyle = isHit ? '#ffffff' : '#37474f';
+      ctx.fillRect(12, 17 + bob, 18, 17);
+      if (!isHit) {
+        ctx.fillStyle = '#80deea';
+        ctx.fillRect(18, 17 + bob, 6, 11);
+        ctx.fillStyle = '#ffd54f';
+        ctx.fillRect(20, 18 + bob, 2, 9);
+      }
+
+      // Cabeça + Óculos com reflexo
+      ctx.fillStyle = P.outline;
+      ctx.fillRect(14, 4 + bob, 14, 13);
+      ctx.fillStyle = isHit ? '#ffffff' : P.skinBase;
+      ctx.fillRect(15, 7 + bob, 12, 9);
+      ctx.fillStyle = isHit ? '#ffffff' : '#2c3e50';
+      ctx.fillRect(15, 4 + bob, 12, 4);
+      if (!isHit) {
+        ctx.fillStyle = '#141013';
+        ctx.fillRect(15, 9 + bob, 11, 3);
+        ctx.fillStyle = isThrow ? '#ffea00' : '#ffffff';
+        ctx.fillRect(16, 10 + bob, 3, 1);
+        ctx.fillRect(21, 10 + bob, 3, 1);
+      }
+
+      // Quadro Branco / Prancheta de Algoritmo na frente
+      const wbX = isThrow ? 2 : 3;
+      const wbY = isThrow ? 10 + bob : 18 + bob;
+      ctx.fillStyle = P.outline;
+      ctx.fillRect(wbX, wbY, 13, 15);
+      ctx.fillStyle = isHit ? '#ffffff' : '#eceff1';
+      ctx.fillRect(wbX + 1, wbY + 1, 11, 13);
+      if (!isHit) {
+        // Diagrama de árvore binária no quadro
+        ctx.fillStyle = isThrow ? '#ff1744' : '#0288d1';
+        ctx.fillRect(wbX + 5, wbY + 3, 3, 2);
+        ctx.fillRect(wbX + 3, wbY + 6, 2, 2);
+        ctx.fillRect(wbX + 8, wbY + 6, 2, 2);
+        ctx.fillStyle = '#ff5252';
+        ctx.fillRect(wbX + 2, wbY + 10, 9, 2);
+      }
+
+      this.set(`enemy_interviewer_${s}`, canvas);
+    });
+
+    // 7. Loira Magra de Óculos que Ataca com o Cabelo (44x50)
+    ['walk1', 'walk2', 'walk3', 'walk4', 'attack', 'hit'].forEach((s, idx) => {
+      const { canvas, ctx } = this.createCanvas(44, 50);
+      const isHit = s === 'hit';
+      const isAtk = s === 'attack';
+      const phase = idx % 4;
+      const bob = isAtk ? 1 : [0, -1, 0, 1][phase];
+      const legL = isAtk ? -2 : [0, -2, 0, 2][phase];
+      const legR = isAtk ? 2 : [0, 2, 0, -2][phase];
+      const hairWave = [0, 2, 1, -1][phase];
+
+      // Pernas finas com botas escuras
+      ctx.fillStyle = P.outline;
+      ctx.fillRect(16, 33 + legL, 4, 15);
+      ctx.fillRect(22, 33 + legR, 4, 15);
+      ctx.fillStyle = isHit ? '#ffffff' : '#1c2833';
+      ctx.fillRect(17, 34 + legL, 2, 10);
+      ctx.fillRect(23, 34 + legR, 2, 10);
+      ctx.fillStyle = isHit ? '#ffffff' : '#111111';
+      ctx.fillRect(16, 44 + legL, 3, 3);
+      ctx.fillRect(22, 44 + legR, 3, 3);
+
+      // Tronco esguio (blusa roxa estilosa)
+      ctx.fillStyle = P.outline;
+      ctx.fillRect(15, 17 + bob, 11, 17);
+      ctx.fillStyle = isHit ? '#ffffff' : '#7b1fa2';
+      ctx.fillRect(16, 18 + bob, 9, 15);
+      if (!isHit) {
+        ctx.fillStyle = '#ba68c8';
+        ctx.fillRect(17, 19 + bob, 4, 11);
+        ctx.fillStyle = '#e1bee7';
+        ctx.fillRect(16, 29 + bob, 9, 2);
+      }
+
+      // Cabeça fina + Rosto
+      ctx.fillStyle = P.outline;
+      ctx.fillRect(15, 5 + bob, 11, 12);
+      ctx.fillStyle = isHit ? '#ffffff' : P.skinBase;
+      ctx.fillRect(16, 8 + bob, 9, 8);
+
+      // Óculos escuros com armação & reflexo ciano
+      if (!isHit) {
+        ctx.fillStyle = '#141013';
+        ctx.fillRect(15, 10 + bob, 8, 3);
+        ctx.fillStyle = isAtk ? '#ffea00' : '#00e5ff';
+        ctx.fillRect(16, 11 + bob, 2, 1);
+        ctx.fillRect(20, 11 + bob, 2, 1);
+      }
+
+      // Cabelo Loiro Longo (atrás ao andar, chicoteando para frente no ataque)
+      ctx.fillStyle = P.outline;
+      ctx.fillRect(15, 3 + bob, 13, 5);
+      ctx.fillStyle = isHit ? '#ffffff' : '#fbc02d';
+      ctx.fillRect(16, 4 + bob, 11, 4);
+      ctx.fillStyle = isHit ? '#ffffff' : '#fff59d';
+      ctx.fillRect(17, 4 + bob, 6, 2);
+
+      if (isAtk) {
+        // Mecha longa chicoteando para a esquerda!
+        ctx.fillStyle = P.outline;
+        ctx.fillRect(1, 7 + bob, 16, 7);
+        ctx.fillStyle = '#fbc02d';
+        ctx.fillRect(2, 8 + bob, 14, 5);
+        ctx.fillStyle = '#fff59d';
+        ctx.fillRect(3, 9 + bob, 11, 2);
+        ctx.fillStyle = '#ffea00';
+        ctx.fillRect(0, 10 + bob, 4, 2);
+      } else {
+        // Cabelo loiro longo caindo pelas costas (lado direito)
+        ctx.fillStyle = P.outline;
+        ctx.fillRect(24, 6 + bob, 8 + Math.max(0, hairWave), 23);
+        ctx.fillStyle = isHit ? '#ffffff' : '#c49000';
+        ctx.fillRect(25, 7 + bob, 6 + Math.max(0, hairWave), 21);
+        ctx.fillStyle = isHit ? '#ffffff' : '#fdd835';
+        ctx.fillRect(25, 7 + bob, 4 + Math.max(0, hairWave), 18);
+        ctx.fillStyle = isHit ? '#ffffff' : '#fff59d';
+        ctx.fillRect(26, 9 + bob, 2, 12);
+      }
+
+      this.set(`enemy_blonde_glasses_${s}`, canvas);
+    });
+
+    // 8. Loira Magra Sem Óculos que Ataca com a Língua (44x50)
+    ['walk1', 'walk2', 'walk3', 'walk4', 'attack', 'hit'].forEach((s, idx) => {
+      const { canvas, ctx } = this.createCanvas(44, 50);
+      const isHit = s === 'hit';
+      const isAtk = s === 'attack';
+      const phase = idx % 4;
+      const bob = isAtk ? 1 : [0, -1, 0, 1][phase];
+      const legL = isAtk ? -2 : [0, -2, 0, 2][phase];
+      const legR = isAtk ? 2 : [0, 2, 0, -2][phase];
+      const hairWave = [0, 2, 1, -1][phase];
+
+      // Pernas finas com botas escuras
+      ctx.fillStyle = P.outline;
+      ctx.fillRect(16, 33 + legL, 4, 15);
+      ctx.fillRect(22, 33 + legR, 4, 15);
+      ctx.fillStyle = isHit ? '#ffffff' : '#1c2833';
+      ctx.fillRect(17, 34 + legL, 2, 10);
+      ctx.fillRect(23, 34 + legR, 2, 10);
+      ctx.fillStyle = isHit ? '#ffffff' : '#ad1457';
+      ctx.fillRect(16, 44 + legL, 3, 3);
+      ctx.fillRect(22, 44 + legR, 3, 3);
+
+      // Tronco esguio (jaqueta/top magenta)
+      ctx.fillStyle = P.outline;
+      ctx.fillRect(15, 17 + bob, 11, 17);
+      ctx.fillStyle = isHit ? '#ffffff' : '#c2185b';
+      ctx.fillRect(16, 18 + bob, 9, 15);
+      if (!isHit) {
+        ctx.fillStyle = '#f06292';
+        ctx.fillRect(17, 19 + bob, 4, 11);
+        ctx.fillStyle = '#ffd54f';
+        ctx.fillRect(16, 29 + bob, 9, 2);
+      }
+
+      // Cabeça fina + Rosto SEM ÓCULOS (olhos expressivos nítidos)
+      ctx.fillStyle = P.outline;
+      ctx.fillRect(15, 5 + bob, 11, 12);
+      ctx.fillStyle = isHit ? '#ffffff' : P.skinBase;
+      ctx.fillRect(16, 8 + bob, 9, 8);
+
+      if (!isHit) {
+        // Olhos visíveis sem óculos
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(16, 10 + bob, 3, 2);
+        ctx.fillRect(20, 10 + bob, 3, 2);
+        ctx.fillStyle = isAtk ? '#ff1744' : '#00acc1';
+        ctx.fillRect(16, 10 + bob, 2, 2);
+        ctx.fillRect(20, 10 + bob, 2, 2);
+      }
+
+      // Cabelo Loiro Longo
+      ctx.fillStyle = P.outline;
+      ctx.fillRect(15, 3 + bob, 13, 5);
+      ctx.fillStyle = isHit ? '#ffffff' : '#fbc02d';
+      ctx.fillRect(16, 4 + bob, 11, 4);
+      ctx.fillStyle = isHit ? '#ffffff' : '#fff59d';
+      ctx.fillRect(17, 4 + bob, 6, 2);
+      ctx.fillStyle = P.outline;
+      ctx.fillRect(24, 6 + bob, 7 + Math.max(0, hairWave), 21);
+      ctx.fillStyle = isHit ? '#ffffff' : '#fdd835';
+      ctx.fillRect(25, 7 + bob, 5 + Math.max(0, hairWave), 19);
+      ctx.fillStyle = isHit ? '#ffffff' : '#fff59d';
+      ctx.fillRect(26, 9 + bob, 2, 11);
+
+      if (isAtk && !isHit) {
+        // Boca aberta + base da língua projetando para a esquerda
+        ctx.fillStyle = '#880e4f';
+        ctx.fillRect(14, 13 + bob, 4, 3);
+        ctx.fillStyle = P.outline;
+        ctx.fillRect(3, 12 + bob, 12, 5);
+        ctx.fillStyle = '#ff4081';
+        ctx.fillRect(4, 13 + bob, 11, 3);
+        ctx.fillStyle = '#ff80ab';
+        ctx.fillRect(5, 13 + bob, 8, 1);
+      }
+
+      this.set(`enemy_blonde_tongue_${s}`, canvas);
     });
   }
 
@@ -1126,5 +1444,62 @@ export class PixelRenderer {
       bCtx.fillRect(7, 1, 3, 3);
       this.set(`proj_git_bomb_${frame}`, bomb);
     });
+
+    // 5. Desafio de Quadro Branco (20x18) - Lançado pelo Avaliador de Live Coding
+    const { canvas: wb, ctx: wbCtx } = this.createCanvas(20, 18);
+    wbCtx.fillStyle = this.palette.outline;
+    wbCtx.fillRect(1, 1, 18, 16);
+    wbCtx.fillStyle = '#eceff1';
+    wbCtx.fillRect(3, 3, 14, 12);
+    wbCtx.fillStyle = '#0288d1';
+    wbCtx.fillRect(8, 5, 4, 2);
+    wbCtx.fillRect(5, 8, 3, 2);
+    wbCtx.fillRect(12, 8, 3, 2);
+    wbCtx.fillStyle = '#ff1744';
+    wbCtx.fillRect(5, 11, 10, 2);
+    this.set('proj_whiteboard', wb);
+
+    // 6. Projétil Vulcan / Metralhadora do Boss (16x8)
+    const { canvas: vulcan, ctx: vCtx } = this.createCanvas(16, 8);
+    vCtx.fillStyle = this.palette.outline;
+    vCtx.fillRect(0, 1, 16, 6);
+    vCtx.fillStyle = '#ff6d00';
+    vCtx.fillRect(1, 2, 13, 4);
+    vCtx.fillStyle = '#ffea00';
+    vCtx.fillRect(6, 2, 8, 4);
+    vCtx.fillStyle = '#ffffff';
+    vCtx.fillRect(10, 3, 4, 2);
+    this.set('proj_vulcan', vulcan);
+
+    // 7. Granada/Morteiro Parabólico do Boss (18x18)
+    const { canvas: mortar, ctx: mtCtx } = this.createCanvas(18, 18);
+    mtCtx.fillStyle = this.palette.outline;
+    mtCtx.fillRect(3, 2, 12, 14);
+    mtCtx.fillRect(2, 4, 14, 10);
+    mtCtx.fillStyle = '#37474f';
+    mtCtx.fillRect(4, 3, 10, 12);
+    mtCtx.fillStyle = '#78909c';
+    mtCtx.fillRect(5, 4, 4, 6);
+    mtCtx.fillStyle = '#ff1744';
+    mtCtx.fillRect(4, 9, 10, 3);
+    mtCtx.fillStyle = '#ffea00';
+    mtCtx.fillRect(7, 1, 4, 3);
+    this.set('proj_mortar', mortar);
+
+    // 8. Míssil Teleguiado do Boss (20x12)
+    const { canvas: missile, ctx: msCtx } = this.createCanvas(20, 12);
+    msCtx.fillStyle = this.palette.outline;
+    msCtx.fillRect(3, 2, 16, 8);
+    msCtx.fillStyle = '#eceff1';
+    msCtx.fillRect(5, 3, 10, 6);
+    msCtx.fillStyle = '#d50000';
+    msCtx.fillRect(14, 3, 4, 6);
+    msCtx.fillRect(4, 1, 4, 2);
+    msCtx.fillRect(4, 9, 4, 2);
+    msCtx.fillStyle = '#ff9100';
+    msCtx.fillRect(0, 4, 4, 4);
+    msCtx.fillStyle = '#ffea00';
+    msCtx.fillRect(1, 5, 2, 2);
+    this.set('proj_missile', missile);
   }
 }

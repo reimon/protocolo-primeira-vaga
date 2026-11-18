@@ -304,14 +304,31 @@ export class WorldRenderer {
       let spriteKey = 'proj_filter';
       if (p.type === 'ghosting') spriteKey = 'proj_ghosting';
       if (p.type === 'shockwave') spriteKey = 'proj_shockwave';
+      if (p.type === 'whiteboard') spriteKey = 'proj_whiteboard';
+      if (p.type === 'vulcan') spriteKey = 'proj_vulcan';
+      if (p.type === 'boss_mortar') spriteKey = 'proj_mortar';
+      if (p.type === 'boss_missile') spriteKey = 'proj_missile';
 
       const sprite = renderer.get(spriteKey);
+      const cx = p.x - cameraX + p.width / 2;
+      const cy = p.y + p.height / 2;
       ctx.save();
       if (p.deflected) {
         ctx.shadowColor = '#00e5ff';
         ctx.shadowBlur = 14;
+      } else if (p.type === 'vulcan' || p.type === 'boss_missile') {
+        ctx.shadowColor = '#ff6d00';
+        ctx.shadowBlur = 8;
       }
-      if (sprite) {
+
+      if (sprite && (p.type === 'vulcan' || p.type === 'boss_missile' || p.type === 'boss_mortar') && ctx.rotate) {
+        const angle = p.type === 'boss_mortar'
+          ? (Date.now() * 0.012)
+          : Math.atan2(p.vy || 0, p.vx || 1);
+        ctx.translate(cx, cy);
+        ctx.rotate(angle);
+        ctx.drawImage(sprite, -sprite.width / 2, -sprite.height / 2);
+      } else if (sprite) {
         ctx.drawImage(sprite, p.x - cameraX, p.y);
       } else {
         ctx.fillStyle = p.deflected ? '#00e5ff' : '#ff1744';

@@ -12,9 +12,10 @@ import { Boss } from '../entities/Boss.js';
 import { ParallaxBackground } from '../world/ParallaxBackground.js';
 import { LoadingScene } from '../world/LoadingScene.js';
 import { LeaderboardService } from '../services/LeaderboardService.js';
-import { buildLevel1 } from '../world/Level1.js';
+import { buildLevel1, LEVEL1_CONFIG } from '../world/Level1.js';
 import { ParticleSystem } from '../world/ParticleSystem.js';
 import { hitDestructible } from '../world/Destructibles.js';
+import { DialogSystem } from '../ui/DialogSystem.js';
 
 export class SelfTest {
   static runAll() {
@@ -99,8 +100,10 @@ export class SelfTest {
 
       // 6. Teste do Boss ATS-9000
       const boss = new Boss(800, 300);
-      assert('Boss inicia com 500 HP na fase 1', boss.hp === 500 && boss.phase === 1);
-      boss.takeDamage(260, false, null, sound, { trigger: () => {} });
+      assert('Boss inicia com 1400 HP na fase 1', boss.hp === 1400 && boss.phase === 1);
+      const armoredHit = boss.takeDamage(100, false, null, sound, { trigger: () => {} });
+      assert('Blindagem do Boss reduz dano fora da janela de núcleo exposto', armoredHit === 75);
+      boss.takeDamage(960, false, null, sound, { trigger: () => {} });
       // Atualiza boss para disparar evento de transição
       boss.update(0.016, player, [], [], [], sound, null, { trigger: () => {} }, () => {});
       assert('Boss transiciona para fase 2 ao atingir 50% HP', boss.phase === 2);
@@ -128,11 +131,11 @@ export class SelfTest {
       assert('LoadingScene responde a avanço de targetProgress', loading.targetProgress === 100);
 
       // 9. Teste de Dados da Fase 1 (Checkpoints, Plataformas Móveis e Armadilhas)
-      const level = buildLevel1(5200, 720);
+      const level = buildLevel1(LEVEL1_CONFIG.width, 720);
       assert('Level1 gera 3 checkpoints', level.checkpoints.length === 3);
       assert('Level1 possui plataformas móveis', level.platforms.some(p => !!p.moving));
       assert('Level1 possui armadilhas de burnout', level.hazards.length >= 3);
-      assert('Level1 instancia o Boss ATS-9000', level.boss && level.boss.maxHp === 500);
+      assert('Level1 instancia o Boss ATS-9000', level.boss && level.boss.maxHp === 1400);
       assert('Level1 possui recompensas secretas altas', level.collectibles.some(c => c.xpBonus >= 120));
 
       // 10. Teste de Level Up e Onda de Código no 3º Hit
@@ -200,9 +203,9 @@ export class SelfTest {
       assert('Após quebrar escudo, ataque frontal causa dano no Golem', shieldGolem.takeDamage(20, 1, null, sound) > 0);
 
       const msBoss = new Boss(800, 300);
-      msBoss.takeDamage(160, false, null, sound, { trigger: () => {} });
+      msBoss.takeDamage(600, false, null, sound, { trigger: () => {} });
       assert('Boss quebra módulo de filtro ao cair abaixo de 70% HP', msBoss.moduleBroken === true);
-      msBoss.takeDamage(500, true, null, sound, { trigger: () => {} });
+      msBoss.takeDamage(1600, true, null, sound, { trigger: () => {} });
       assert('Boss inicia morte cinematográfica antes de finalizar', msBoss.isDead === true && msBoss.deathFinished === false);
       for (let t = 0; t < 12; t++) {
         msBoss.update(0.2, msPlayer, [], [], [], sound, null, { trigger: () => {} }, () => {});
@@ -212,7 +215,7 @@ export class SelfTest {
       assert('Level1 possui caixas destrutíveis, POWs e plataformas na arena do Boss',
         Array.isArray(level.crates) && level.crates.length >= 4 &&
         Array.isArray(level.pows) && level.pows.length >= 3 &&
-        level.platforms.some(p => p.x >= 4450 && p.y < 720 - 160)
+        level.platforms.some(p => p.x >= LEVEL1_CONFIG.bossTriggerX && p.y < 720 - 160)
       );
 
       const ps = new ParticleSystem();
@@ -302,6 +305,144 @@ export class SelfTest {
       assert('Level1 possui barris explosivos e servidores/caixas multi-hit',
         level.crates.some(c => c.kind === 'barrel' && c.explosive) &&
         level.crates.some(c => (c.maxHp || 1) >= 2)
+      );
+
+      // 16. Testes da Fase 1 Expandida & Novos Inimigos Temáticos do Projeto
+      assert('Fase 1 expandida possui largura >= 9000 e maior densidade de encontros',
+        LEVEL1_CONFIG.width >= 9000 &&
+        level.enemies.length >= 20 &&
+        level.platforms.length >= 22 &&
+        level.pows.length >= 5
+      );
+      assert('Sprites Hi-Bit gerados para Scroll Infinito, Live Coding e projétil Whiteboard',
+        !!renderer.get('enemy_procrastination_walk4') && !!renderer.get('enemy_procrastination_charge') &&
+        !!renderer.get('enemy_interviewer_walk4') && !!renderer.get('enemy_interviewer_throw') &&
+        !!renderer.get('proj_whiteboard')
+      );
+
+      const scrollBot = new Enemy('procrastination', 300, 300);
+      const scrollPlayer = new Player(450, 300);
+      scrollBot.update(0.016, scrollPlayer, [], [], sound, null);
+      assert('Scroll Infinito inicia windup de investida ao avistar o Player',
+        scrollBot.label === 'SCROLL INFINITO' && scrollBot.chargeState === 'windup'
+      );
+
+      const interviewer = new Enemy('interviewer', 500, 300);
+      const intProj = [];
+      interviewer.throwTimer = 0.01;
+      interviewer.update(0.05, scrollPlayer, [], intProj, sound, null);
+      assert('Avaliador Live Coding lança projétil Whiteboard deflectável',
+        interviewer.label === 'LIVE CODING' &&
+        intProj.length === 1 && intProj[0].type === 'whiteboard' && intProj[0].isEnemy === true
+      );
+
+      // 17. Testes de IA & Arsenal Metal Slug do Boss ATS-9000
+      assert('Sprites Hi-Bit gerados para projéteis Metal Slug do Boss (vulcan, mortar, missile)',
+        !!renderer.get('proj_vulcan') && !!renderer.get('proj_mortar') && !!renderer.get('proj_missile')
+      );
+
+      const aiBoss = new Boss(800, 300);
+      const aiPlayer = new Player(350, 350);
+      const bossProjectiles = [];
+      const dummyShake = { trigger: () => {} };
+
+      aiBoss.startAttackState('vulcan_burst', aiPlayer);
+      for (let i = 0; i < 40; i++) {
+        aiBoss.update(0.03, aiPlayer, [], bossProjectiles, [], sound, null, dummyShake, () => {});
+      }
+      assert('Boss executa rajada Vulcan mirando na direção do Player',
+        bossProjectiles.some(p => p.type === 'vulcan' && p.isEnemy === true)
+      );
+
+      bossProjectiles.length = 0;
+      aiBoss.startAttackState('mortar_barrage', aiPlayer);
+      for (let i = 0; i < 45; i++) {
+        aiBoss.update(0.03, aiPlayer, [], bossProjectiles, [], sound, null, dummyShake, () => {});
+      }
+      assert('Boss lança morteiros parabólicos com gravidade',
+        bossProjectiles.some(p => p.type === 'boss_mortar' && p.gravity > 0)
+      );
+
+      bossProjectiles.length = 0;
+      aiBoss.startAttackState('missile_salvo', aiPlayer);
+      for (let i = 0; i < 30; i++) {
+        aiBoss.update(0.03, aiPlayer, [], bossProjectiles, [], sound, null, dummyShake, () => {});
+      }
+      assert('Boss dispara salva de mísseis teleguiados',
+        bossProjectiles.some(p => p.type === 'boss_missile' && p.homingTime > 0)
+      );
+
+      aiBoss.phase = 2;
+      aiBoss.mentorEventTriggered = true;
+      aiBoss.startAttackState('mega_beam', aiPlayer);
+      for (let i = 0; i < 45; i++) {
+        aiBoss.update(0.03, aiPlayer, [], bossProjectiles, [], sound, null, dummyShake, () => {});
+      }
+      assert('Boss ativa Mega-Beam estilo Metal Slug na Fase 2',
+        aiBoss.beamActive === true && aiBoss.getMegaBeamHitbox() !== null
+      );
+
+      aiBoss.startAttackState('charge_rush', aiPlayer);
+      const startRushX = aiBoss.x;
+      for (let i = 0; i < 30; i++) {
+        aiBoss.update(0.03, aiPlayer, [], bossProjectiles, [], sound, null, dummyShake, () => {});
+      }
+      assert('Boss executa investida horizontal pela arena',
+        aiBoss.x !== startRushX
+      );
+
+      // 18. Testes das Novas Inimigas da Fase 1 (Loira de Óculos / Cabelo & Loira Sem Óculos / Língua)
+      assert('Sprites Hi-Bit gerados para blonde_glasses e blonde_tongue',
+        !!renderer.get('enemy_blonde_glasses_walk4') && !!renderer.get('enemy_blonde_glasses_attack') &&
+        !!renderer.get('enemy_blonde_tongue_walk4') && !!renderer.get('enemy_blonde_tongue_attack')
+      );
+
+      assert('Level1 inclui instâncias de blonde_glasses e blonde_tongue',
+        level.enemies.some(e => e.type === 'blonde_glasses') &&
+        level.enemies.some(e => e.type === 'blonde_tongue')
+      );
+
+      const enemyFloor = [{ x: 0, y: 352, width: 1000, height: 40 }];
+      const hairEnemy = new Enemy('blonde_glasses', 400, 300);
+      const hairTarget = new Player(290, 310);
+      for (let i = 0; i < 35; i++) {
+        hairEnemy.update(0.02, hairTarget, enemyFloor, [], sound, null);
+      }
+      assert('Chefe Louca (óculos) chicoteia cabelo com longo alcance e causa dano',
+        hairEnemy.label === 'CHEFE LOUCA' && hairTarget.hp < 100
+      );
+
+      const tongueEnemy = new Enemy('blonde_tongue', 400, 300);
+      const tongueTarget = new Player(255, 310);
+      for (let i = 0; i < 40; i++) {
+        tongueEnemy.update(0.02, tongueTarget, enemyFloor, [], sound, null);
+      }
+      assert('Chefe Louca (sem óculos) estende língua com longo alcance e causa dano',
+        tongueEnemy.label === 'CHEFE LOUCA' && tongueTarget.hp < 100
+      );
+
+      // 19. Teste de Diálogo Multi-Speaker (Chefe Louca vs Herói/Heroína)
+      const dlg = new DialogSystem(sound, 0.01);
+      let finishCalled = false;
+      dlg.open({
+        data: {
+          openSound: 'alert',
+          lines: [
+            { speaker: 'CHEFE LOUCA', portrait: 'chefe_louca', text: 'Quero todos os relatórios e visitar clientes agora!' },
+            { speaker: 'HERÓI DEV', portrait: 'hero', text: 'Mesmo usando IA ainda não dá tempo!' }
+          ],
+          onFinish: () => { finishCalled = true; }
+        }
+      });
+      assert('DialogSystem abre diálogo estruturado da Chefe Louca',
+        dlg.isOpen === true && dlg.getLineSpeaker(dlg.activeDialog.lines[0]) === 'CHEFE LOUCA'
+      );
+      dlg.advance({ player: hairTarget, stats: { activeMentorTip: '' }, particles: null, touchEnabled: false });
+      dlg.advance({ player: hairTarget, stats: { activeMentorTip: '' }, particles: null, touchEnabled: false });
+      dlg.advance({ player: hairTarget, stats: { activeMentorTip: '' }, particles: null, touchEnabled: false });
+      const closed = dlg.advance({ player: hairTarget, stats: { activeMentorTip: '' }, particles: null, touchEnabled: false });
+      assert('DialogSystem alterna falas e executa onFinish ao encerrar',
+        closed === true && !dlg.isOpen && finishCalled === true
       );
 
     } catch (error) {
